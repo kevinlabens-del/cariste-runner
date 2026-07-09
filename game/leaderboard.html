@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Classement — Cariste Runner</title>
+  <style>
+    :root{--bg:#0f172a;--fg:#e5e7eb;--muted:#94a3b8;--accent:#10b981}
+    html,body{margin:0;height:100%;background:#0f172a;color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .wrap{max-width:900px;margin:0 auto;padding:20px}
+    h1{margin:0 0 12px;font-size:clamp(22px,3vw,28px)}
+    p{color:var(--muted)}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px}
+    .btn{appearance:none;border:0;background:linear-gradient(180deg,#10b981,#089d7f);color:white;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    table{width:100%;border-collapse:collapse;background:rgba(255,255,255,.03);border-radius:12px;overflow:hidden}
+    th,td{padding:12px 10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
+    th{color:#9fb1c7;font-weight:700}
+    tr:hover td{background:rgba(255,255,255,.03)}
+    .muted{color:var(--muted)}
+  
+    /* Navigation du classement : icônes seules, sans cadre ni fond. */
+    .actions .btn{
+      width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;
+      padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;
+      box-shadow:none!important;color:var(--fg)!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+      font-size:30px!important;line-height:1!important;text-decoration:none!important;-webkit-tap-highlight-color:transparent;
+      transition:transform .13s ease,filter .13s ease;
+    }
+    .actions .btn:hover{filter:drop-shadow(0 4px 7px rgba(0,0,0,.55)) brightness(1.12);}
+    .actions .btn:active{transform:scale(.86);}
+
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Classement en ligne — Cariste Runner</h1>
+    <p class="muted">Affiche les meilleurs scores en ligne, avec un seul résultat par pseudo.</p>
+    <div class="actions">
+      <button class="btn" id="refresh" type="button" aria-label="Actualiser le classement" title="Actualiser le classement">🔄</button>
+      <a class="btn" href="../accueil.html" aria-label="Revenir au jeu" title="Revenir au jeu">↩️</a>
+    </div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Pseudo</th><th>Score</th></tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="3" class="muted">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+<script>
+  // Même URL Apps Script que dans le jeu
+  const SCORE_API_URL = "https://script.google.com/macros/s/AKfycbw7DhCZAIBRf3200soATYvJHH0ypodz5dNQaltUk86bfTLWPWv7N0y3gDOmivHiQnQ/exec";
+
+  function normalizeName(value){
+    return (value || 'Joueur').toString().trim().replace(/\s+/g, ' ');
+  }
+
+  function normalizeScore(value){
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  }
+
+  function getLeaderboardList(data){
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.leaderboard)) return data.leaderboard;
+    if (Array.isArray(data.scores)) return data.scores;
+    if (Array.isArray(data.rows)) return data.rows;
+    return [];
+  }
+
+  function getItemName(item){
+    if (!item) return '';
+    if (typeof item === 'string') return normalizeName(item);
+    return normalizeName(item.name || item.pseudo || item.player || item.playerName || item.username);
+  }
+
+  function getItemScore(item){
+    if (!item || typeof item === 'string') return 0;
+    return normalizeScore(item.score || item.bestScore || item.points || item.total);
+  }
+
+  function buildUniqueBestScores(items){
+    const bestByPseudo = new Map();
+
+    for (const item of items) {
+      const name = getItemName(item);
+      const score = getItemScore(item);
+      if (!name || score <= 0) continue;
+      const key = name.toLocaleLowerCase('fr-FR');
+      const previous = bestByPseudo.get(key);
+
+      if (!previous || score > previous.score) {
+        bestByPseudo.set(key, { name, score });
+      }
+    }
+
+    return [...bestByPseudo.values()]
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'fr-FR'))
+      .slice(0, 100);
+  }
+
+  async function loadBoard(){
+    const body = document.getElementById('rows');
+    body.innerHTML = '<tr><td colspan="3" class="muted">Chargement…</td></tr>';
+
+    try{
+      const res = await fetch(SCORE_API_URL, { cache: 'no-store' });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const uniqueScores = buildUniqueBestScores(getLeaderboardList(data));
+
+      const rows = uniqueScores.map((item, index) => {
+        return `<tr><td>${index + 1}</td><td>${escapeHTML(item.name)}</td><td>${item.score}</td></tr>`;
+      }).join('');
+
+      body.innerHTML = rows || '<tr><td colspan="3" class="muted">Aucun score pour le moment.</td></tr>';
+    }catch(e){
+      console.warn(e);
+      body.innerHTML = '<tr><td colspan="3" class="muted">Erreur de chargement. Réessayez.</td></tr>';
+    }
+  }
+
+  function escapeHTML(s){ return (s||'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])) }
+
+  document.getElementById('refresh').addEventListener('click', loadBoard);
+  loadBoard();
+</script>
+</body>
+</html>

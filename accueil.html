@@ -1,0 +1,3250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Cariste Runner</title>
+  <meta name="theme-color" content="#0b1324" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+
+  <script id="cr-mobile-ui-boot">
+    (function(){
+      try{
+        var mm = window.matchMedia || function(){ return { matches:false }; };
+        var standalone = mm('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        var coarse = mm('(pointer: coarse)').matches || (navigator.maxTouchPoints || 0) > 0;
+        var phoneUA = /Android|iPhone|iPod|Windows Phone|Mobile/i.test(navigator.userAgent || '');
+        var smallScreen = Math.min(screen.width || 0, screen.height || 0) <= 920;
+        if ((coarse && (phoneUA || smallScreen)) || (standalone && coarse)) {
+          document.documentElement.classList.add('cr-mobile-ui');
+        }
+        if (standalone) document.documentElement.classList.add('cr-standalone-ui');
+      }catch(e){}
+    })();
+  </script>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icons/icon-192.png" sizes="192x192" />
+  <style>
+    :root{--bg:#0f172a;--fg:#e5e7eb;--muted:#94a3b8;--accent:#10b981;--danger:#f43f5e}
+    html,body{margin:0;height:100%;width:100%;overflow-x:hidden;background:radial-gradient(120% 140% at 50% -10%,#0b1324,var(--bg));color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    .wrap{max-width:1000px;margin:0 auto;padding:8px 16px 16px;display:grid;gap:16px}
+    .top-banner{display:flex;justify-content:center;align-items:center;padding-top:max(6px, env(safe-area-inset-top));margin:0 auto 4px}
+    .top-banner img{display:block;width:min(92vw,340px);max-width:100%;height:auto}
+    h1{margin:8px 0 0;font-weight:800;font-size:clamp(20px,3vw,28px);letter-spacing:.2px}
+    .hud{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .scores{display:flex;gap:14px;align-items:baseline;font-variant-numeric:tabular-nums}
+    .btn{appearance:none;border:0;background:linear-gradient(180deg,#10b981,#059669);color:white;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+    .btn.secondary{background:linear-gradient(180deg,#64748b,#475569)}
+    .btn:disabled{filter:grayscale(1) brightness(.8);cursor:not-allowed}
+    canvas{width:100%;height:auto;display:block;border-radius:14px;background:#08101f;box-shadow:0 12px 40px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.05);touch-action:manipulation}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px}
+    .muted{color:var(--muted)}
+    .signature{text-align:center;font-size:12px;color:var(--muted);margin:12px 0}
+    .toast{position:fixed;top:10px;right:10px;z-index:20;pointer-events:none}
+    .toast .msg{background:#0b1220;border:1px solid rgba(255,255,255,.12);padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transform:translateY(-10px);transition:.25s}
+    .toast.show .msg{opacity:1;transform:translateY(0)}
+    .progress{height:6px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}
+    .bar{height:100%;background:linear-gradient(90deg,#10b981,#22d3ee);width:0%}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,.7);z-index:50;padding:16px;box-sizing:border-box;touch-action:manipulation}
+    .modal.open{display:flex}
+    .modal .box{width:min(520px,calc(100vw - 32px));background:#0b1220;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.45);box-sizing:border-box}
+    .field{display:flex;gap:8px}
+    .input{flex:1;min-width:0;background:#0f172a;border:1px solid rgba(255,255,255,.1);color:var(--fg);border-radius:10px;padding:10px 12px;font-size:18px!important;line-height:1.25;touch-action:manipulation;-webkit-text-size-adjust:100%}
+    .name-status{min-height:18px;margin-top:9px;font-size:13px;line-height:1.35;color:var(--muted)}
+    .name-status.ok{color:#22c55e}
+    .name-status.err{color:#fb7185}
+    .name-status.wait{color:#22d3ee}
+    #nameInput{font-size:18px!important;line-height:1.25;min-height:44px;transform:translateZ(0);-webkit-transform:translateZ(0);}
+    input,textarea,select{font-size:16px!important;}
+    html.cr-name-focus,html.cr-name-focus body{overflow-x:hidden!important;touch-action:manipulation;}
+
+    .install-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .install-zone{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:0}
+    .install-zone.is-hidden{display:none!important}
+    .btn.install{background:linear-gradient(180deg,#f59e0b,#b45309);color:#111827}
+    .install-status{font-size:12px;color:var(--muted)}
+    .btn.install.ready{box-shadow:0 0 0 1px rgba(245,158,11,.35),0 8px 22px rgba(245,158,11,.18)}
+    .music-panel{gap:6px;flex-wrap:wrap;max-width:100%;}
+    .music-panel input[type="file"]{display:none}
+    .music-status{color:var(--muted);font-size:12px;max-width:min(230px,60vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .music-btn{appearance:none;border:0;border-radius:999px;background:rgba(255,255,255,.1);color:var(--fg);font-size:12px;font-weight:800;padding:7px 10px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+    .music-btn:active{transform:translateY(1px)}
+    .music-btn.primary{background:linear-gradient(180deg,#22c55e,#059669);color:white}
+    .music-btn.stop{background:linear-gradient(180deg,#f97316,#b45309);color:white}
+    .music-volume{grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;line-height:1}
+    .music-volume input[type=range]{flex:1;min-width:120px;accent-color:#22d3ee}
+    .game-frame{position:relative;width:100%;border-radius:14px;overflow:visible}
+    .frame-fs-btn{position:absolute;right:10px;top:10px;z-index:8;width:42px;height:42px;border:0;border-radius:14px;background:rgba(15,23,42,.72);color:#e5e7eb;font-size:22px;font-weight:900;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);cursor:pointer}
+    .frame-fs-btn:active,.fs-btn:active,.fs-back:active{transform:translateY(1px)}
+    .fs-back,.fs-hud,.fs-actions,.fs-help,.fs-notice{display:none}
+    .game-frame.is-fullscreen{position:fixed;inset:0;z-index:1000;background:#050b16;border-radius:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0!important}
+    .game-frame.is-fullscreen canvas{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;min-height:0!important;aspect-ratio:auto!important;border-radius:0;box-shadow:none;background:#08101f}
+    .game-frame.is-fullscreen .frame-fs-btn{display:none}
+    .game-frame.is-fullscreen .fs-back{display:flex;position:absolute;left:calc(10px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));z-index:12;width:44px;height:44px;border:0;border-radius:999px;align-items:center;justify-content:center;background:rgba(15,23,42,.66);color:#fff;font-size:24px;font-weight:900;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);backdrop-filter:blur(8px)}
+    .game-frame.is-fullscreen .fs-hud{display:flex;position:absolute;left:calc(64px + env(safe-area-inset-left));right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:11;gap:8px;align-items:center;justify-content:flex-start;flex-wrap:wrap;pointer-events:none}
+    .fs-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:999px;background:rgba(15,23,42,.58);border:1px solid rgba(255,255,255,.12);color:#e5e7eb;font-size:clamp(12px,2.1vw,16px);font-weight:800;backdrop-filter:blur(8px);text-shadow:0 1px 2px rgba(0,0,0,.45)}
+    .game-frame.is-fullscreen .fs-actions{display:flex;position:absolute;right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:12;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;max-width:min(92vw,720px)}
+    .fs-btn{border:0;border-radius:999px;background:rgba(15,23,42,.60);color:#fff;min-width:42px;height:42px;padding:0 12px;font-weight:900;font-size:16px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);backdrop-filter:blur(8px)}
+    .fs-btn.play{background:rgba(5,150,105,.72)}
+    .fs-btn.stop{background:rgba(194,65,12,.78)}
+    .fs-volume{display:flex;align-items:center;gap:6px;height:42px;padding:0 10px;border-radius:999px;background:rgba(15,23,42,.60);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;font-weight:900}
+    .fs-volume input{width:min(22vw,140px);accent-color:#22d3ee}
+    .game-frame.is-fullscreen .fs-back,.game-frame.is-fullscreen .fs-actions,.game-frame.is-fullscreen .fs-btn,.game-frame.is-fullscreen .fs-volume,.game-frame.is-fullscreen .fs-volume input{pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+    .game-frame.is-fullscreen canvas{touch-action:none}
+    .game-frame.is-fullscreen .fs-help{display:block;position:absolute;left:50%;bottom:calc(62px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:13;max-width:min(92vw,620px);padding:10px 14px;border-radius:16px;background:rgba(15,23,42,.76);border:1px solid rgba(255,255,255,.14);color:#e5e7eb;font-size:clamp(13px,2.2vw,16px);text-align:center;backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .25s}
+    .game-frame.is-fullscreen .fs-help.show{opacity:1}
+    .game-frame.is-fullscreen .fs-notice{display:block;position:absolute;left:50%;top:calc(58px + env(safe-area-inset-top));transform:translateX(-50%);z-index:13;max-width:min(88vw,720px);padding:8px 12px;border-radius:14px;background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.12);color:#e5e7eb;font-size:clamp(12px,2vw,15px);font-weight:750;text-align:center;backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .25s}
+    .game-frame.is-fullscreen .fs-notice.show{opacity:1}
+    html.cr-fs-active,html.cr-fs-active body{overflow:hidden!important;overscroll-behavior:none}
+    @media (max-width:520px){
+      .install-zone{width:100%}
+      .install-status{width:100%}
+      .modal .box{padding:14px}
+      .music-panel{width:100%}
+      .music-status{width:100%;max-width:100%}
+      .music-volume{width:100%;max-width:100%}
+      .music-btn{flex:1;min-width:64px}
+      .field{gap:10px;align-items:stretch}
+      #nameInput{font-size:18px!important}
+    }
+  
+
+  /* Correctif final mobile : signature bien visible et vraiment collée en bas */
+  @media (max-width:720px), (hover:none) and (pointer:coarse){
+    .wrap{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important;}
+    .signature{padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important;}
+    .signature .sig-brand{font-size:clamp(16px,4.9vw,19px)!important;}
+    .signature .sig-row{font-size:clamp(11.2px,3.12vw,13.2px)!important;gap:10px!important;}
+  }
+
+</style>
+
+<style>
+  .pill-legend{ margin-top:8px; }
+  .pill-legend .muted{ font-size: 0.92em; opacity: 0.9; }
+  @media (max-width: 480px){
+    .pill-legend .muted{ font-size: 0.88em; }
+  }
+</style>
+
+<script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js', { scope: './' }).then((r)=>{ if(r.waiting) r.waiting.postMessage({type:'SKIP_WAITING'}); }).catch(console.error);
+      });
+    }
+  </script>
+
+<style id="cr-mobile-app-ui-v365">
+  /* Version finale propre — chat ouvert directement via Apps Script pour éviter le blocage iframe. */
+  @media (max-width:720px), (hover:none) and (pointer:coarse){
+
+    html,body{width:100%;max-width:100%;overflow-x:hidden}
+    .top-banner{padding-top:max(0px,env(safe-area-inset-top));margin:0 auto clamp(28px,5vh,58px)}
+    .top-banner img{width:min(94vw,660px);max-width:100%;height:auto;max-height:36vh;object-fit:contain}
+    .wrap{width:100%;max-width:none;box-sizing:border-box;margin:0;padding:0 clamp(20px,4vw,30px) 20px;gap:16px}
+    h1{font-size:clamp(29px,7vw,39px);line-height:1.05;margin:0 0 2px}
+    .hud{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(84px,.55fr);gap:12px;width:100%;align-items:stretch}
+    .scores{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 15px;width:100%;font-size:clamp(22px,5.1vw,28px);line-height:1.15;align-items:start}
+    .scores span{display:block;min-width:0;white-space:normal;overflow-wrap:normal}
+    .scores b{font-weight:800}
+    .music-panel{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px 9px;width:100%;max-width:100%;box-sizing:border-box;padding:7px clamp(12px,2.6vw,18px);border-radius:30px;align-items:center}
+    .music-status{grid-column:1/-1;width:100%;max-width:100%;font-size:clamp(16px,4.1vw,20px);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .music-volume{grid-column:1/-1;font-size:clamp(13px,3.4vw,16px)}
+    .music-btn{min-height:40px;font-size:clamp(15px,3.9vw,19px);padding:7px 7px;border-radius:999px}
+    #setNameBtn{grid-column:1/2}
+    #playBtn{grid-column:2/3}
+    #pauseBtn{grid-column:3/4}
+    .btn{min-height:52px;font-size:clamp(16px,4.1vw,20px);padding:10px 12px;border-radius:13px;white-space:normal;line-height:1.15}
+    .install-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(84px,.55fr);gap:9px 11px;width:100%;margin-top:0}
+    #onlineBtn{grid-column:1/2;min-height:52px}
+    .install-zone{grid-column:2/-1;display:grid;grid-template-columns:1fr;gap:6px;align-items:center}
+    .install-zone.is-hidden{display:none!important}
+    .install-zone .btn{width:100%}
+    .install-status{font-size:14px;line-height:1.25}
+    .progress{height:8px;margin:8px 0 12px}
+    canvas{width:100%!important;max-width:100%;margin:0 auto;border-radius:14px;aspect-ratio:960/450;min-height:450px;max-height:450px}
+    .pill{font-size:clamp(17px,4.2vw,22px);padding:9px 16px;border-radius:20px;line-height:1.25}
+    .pill-legend .muted{font-size:clamp(15px,3.8vw,19px)}
+    .signature{font-size:clamp(15px,4vw,18px);margin:12px 0 calc(16px + env(safe-area-inset-bottom))}
+
+  }
+    html.cr-mobile-ui, html.cr-mobile-ui body{width:100%;max-width:100%;overflow-x:hidden}
+    html.cr-mobile-ui .top-banner{padding-top:max(0px,env(safe-area-inset-top));margin:0 auto clamp(28px,5vh,58px)}
+    html.cr-mobile-ui .top-banner img{width:min(94vw,660px);max-width:100%;height:auto;max-height:36vh;object-fit:contain}
+    html.cr-mobile-ui .wrap{width:100%;max-width:none;box-sizing:border-box;margin:0;padding:0 clamp(20px,4vw,30px) 20px;gap:16px}
+    html.cr-mobile-ui h1{font-size:clamp(29px,7vw,39px);line-height:1.05;margin:0 0 2px}
+    html.cr-mobile-ui .hud{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(84px,.55fr);gap:12px;width:100%;align-items:stretch}
+    html.cr-mobile-ui .scores{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 15px;width:100%;font-size:clamp(22px,5.1vw,28px);line-height:1.15;align-items:start}
+    html.cr-mobile-ui .scores span{display:block;min-width:0;white-space:normal;overflow-wrap:normal}
+    html.cr-mobile-ui .scores b{font-weight:800}
+    html.cr-mobile-ui .music-panel{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px 9px;width:100%;max-width:100%;box-sizing:border-box;padding:7px clamp(12px,2.6vw,18px);border-radius:30px;align-items:center}
+    html.cr-mobile-ui .music-status{grid-column:1/-1;width:100%;max-width:100%;font-size:clamp(16px,4.1vw,20px);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    html.cr-mobile-ui .music-volume{grid-column:1/-1;font-size:clamp(13px,3.4vw,16px)}
+    html.cr-mobile-ui .music-btn{min-height:40px;font-size:clamp(15px,3.9vw,19px);padding:7px 7px;border-radius:999px}
+    html.cr-mobile-ui #setNameBtn{grid-column:1/2}
+    html.cr-mobile-ui #playBtn{grid-column:2/3}
+    html.cr-mobile-ui #pauseBtn{grid-column:3/4}
+    html.cr-mobile-ui .btn{min-height:52px;font-size:clamp(16px,4.1vw,20px);padding:10px 12px;border-radius:13px;white-space:normal;line-height:1.15}
+    html.cr-mobile-ui .install-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(84px,.55fr);gap:9px 11px;width:100%;margin-top:0}
+    html.cr-mobile-ui #onlineBtn{grid-column:1/2;min-height:52px}
+    html.cr-mobile-ui .install-zone{grid-column:2/-1;display:grid;grid-template-columns:1fr;gap:6px;align-items:center}
+    html.cr-mobile-ui .install-zone.is-hidden{display:none!important}
+    html.cr-mobile-ui .install-zone .btn{width:100%}
+    html.cr-mobile-ui .install-status{font-size:14px;line-height:1.25}
+    html.cr-mobile-ui .progress{height:8px;margin:8px 0 12px}
+    html.cr-mobile-ui canvas{width:100%!important;max-width:100%;margin:0 auto;border-radius:14px;aspect-ratio:960/450;min-height:450px;max-height:450px}
+    html.cr-mobile-ui .pill{font-size:clamp(17px,4.2vw,22px);padding:9px 16px;border-radius:20px;line-height:1.25}
+    html.cr-mobile-ui .pill-legend .muted{font-size:clamp(15px,3.8vw,19px)}
+    html.cr-mobile-ui .signature{font-size:clamp(15px,4vw,18px);margin:12px 0 calc(16px + env(safe-area-inset-bottom))}
+</style>
+
+
+<style id="cr-first-play-v367">
+  .first-play-overlay{
+    position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
+    padding:18px;border-radius:14px;background:linear-gradient(180deg,rgba(2,6,23,.28),rgba(2,6,23,.44));
+    backdrop-filter:blur(2px);text-align:center;pointer-events:auto;
+  }
+  .first-play-overlay[hidden]{display:none!important}
+  .first-play-card{display:flex;flex-direction:column;align-items:center;gap:8px;max-width:min(82vw,360px);padding:14px 16px;border-radius:20px;background:rgba(15,23,42,.68);border:1px solid rgba(255,255,255,.16);box-shadow:0 14px 36px rgba(0,0,0,.38),inset 0 0 0 1px rgba(255,255,255,.06)}
+  .first-play-title{font-weight:900;color:#fff;font-size:clamp(18px,4.6vw,24px);line-height:1.05;text-shadow:0 2px 8px rgba(0,0,0,.45)}
+  .first-play-text{color:#cbd5e1;font-size:clamp(12px,3.4vw,15px);line-height:1.25;margin:0}
+  .first-play-btn{appearance:none;border:0;border-radius:999px;padding:11px 22px;background:linear-gradient(180deg,#22c55e,#059669);color:#fff;font-size:clamp(17px,4.4vw,22px);font-weight:900;box-shadow:0 10px 24px rgba(34,197,94,.26),inset 0 0 0 1px rgba(255,255,255,.18);cursor:pointer}
+  .first-play-btn:active{transform:translateY(1px)}
+  .game-frame.is-fullscreen .first-play-overlay{z-index:10;border-radius:0;background:linear-gradient(180deg,rgba(2,6,23,.18),rgba(2,6,23,.34))}
+  .game-frame.is-fullscreen .first-play-card{max-width:min(52vw,440px)}
+</style>
+
+<style id="cr-chat-v370">
+  #chatBtn{grid-column:2/3;min-height:52px;background:linear-gradient(180deg,#38bdf8,#0284c7);color:white}
+  .install-row #installPwaZone{grid-column:1/-1}
+  html.cr-mobile-ui #chatBtn{grid-column:2/3;min-height:52px}
+  .fs-btn.chat{background:linear-gradient(180deg,#38bdf8,#0284c7);color:white}
+</style>
+
+
+
+<style id="cr-final-polish-v372">
+  /* Version finale propre — aération mobile + signature CR3ATIX™. */
+  @media (max-width:720px), (hover:none) and (pointer:coarse){
+    .wrap{gap:18px!important;padding-bottom:24px!important}
+    h1{margin-bottom:7px!important}
+    .hud{gap:14px!important}
+    .scores{margin-bottom:2px!important}
+    .music-panel{margin-top:3px!important;margin-bottom:3px!important}
+    .install-row{gap:11px 12px!important;margin-top:2px!important}
+    .progress{margin:12px 0 17px!important}
+    .game-frame{margin-top:3px!important;margin-bottom:11px!important}
+    .pill{margin-top:2px!important}
+    .pill + .pill{margin-top:5px!important}
+    .signature{margin-top:17px!important;letter-spacing:.15px}
+    .signature b:first-child{color:#e5e7eb;font-weight:900;letter-spacing:.4px}
+  }
+  html.cr-mobile-ui .wrap{gap:18px!important;padding-bottom:24px!important}
+  html.cr-mobile-ui h1{margin-bottom:7px!important}
+  html.cr-mobile-ui .hud{gap:14px!important}
+  html.cr-mobile-ui .scores{margin-bottom:2px!important}
+  html.cr-mobile-ui .music-panel{margin-top:3px!important;margin-bottom:3px!important}
+  html.cr-mobile-ui .install-row{gap:11px 12px!important;margin-top:2px!important}
+  html.cr-mobile-ui .progress{margin:12px 0 17px!important}
+  html.cr-mobile-ui .game-frame{margin-top:3px!important;margin-bottom:11px!important}
+  html.cr-mobile-ui .pill{margin-top:2px!important}
+  html.cr-mobile-ui .pill + .pill{margin-top:5px!important}
+  html.cr-mobile-ui .signature{margin-top:17px!important;letter-spacing:.15px}
+  html.cr-mobile-ui .signature b:first-child{color:#e5e7eb;font-weight:900;letter-spacing:.4px}
+</style>
+
+
+<style id="cr-clean-final-non-gameplay-ui">
+  /* Version finale propre : ajouts visuels conservés, gameplay verrouillé sur V3.7.2.
+     Aucun réglage canvas, collision, saut, vitesse, voie, joueur ou boucle de jeu ici. */
+  html{background:#071120!important;}
+  body{
+    position:relative;
+    background:transparent!important;
+    min-height:100svh;
+    isolation:isolate;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+    background:
+      linear-gradient(180deg,rgba(3,8,18,.28),rgba(7,17,35,.18) 42%,rgba(7,17,35,.36) 100%),
+      url("./assets/warehouse-bg.png") center center / cover no-repeat;
+    filter:saturate(1.06) contrast(1.03) brightness(1.10);
+    transform:translateZ(0);
+  }
+  body::after{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(95% 70% at 50% 18%,rgba(255,255,255,.08),transparent 58%),
+      linear-gradient(180deg,rgba(7,17,35,.02),rgba(7,17,35,.10) 58%,rgba(7,17,35,.24) 100%);
+  }
+  .top-banner,.wrap{position:relative;z-index:2;}
+  .toast{z-index:30;}
+  .modal{z-index:50;}
+  h1,.scores span,.signature,.toast .msg{text-shadow:0 2px 10px rgba(0,0,0,.45);}
+
+  .main-panel{display:flex;flex-direction:column;gap:10px;}
+  .action-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+    gap:8px;
+    width:100%;
+    align-items:stretch;
+  }
+  .action-grid #installPwaZone{grid-column:1/-1;margin-top:2px;}
+  .action-grid #installPwaZone.is-hidden{display:none!important;}
+  .action-grid .btn{
+    min-height:42px;
+    padding:8px 10px;
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    line-height:1.1;
+    font-weight:850;
+  }
+  .action-grid .icon-btn{
+    position:relative;
+    overflow:hidden;
+    flex-direction:column;
+    gap:2px;
+    border:1px solid rgba(255,199,91,.32)!important;
+    background:
+      linear-gradient(90deg,rgba(0,0,0,.18) 0 9%,transparent 9% 91%,rgba(0,0,0,.18) 91% 100%),
+      repeating-linear-gradient(0deg,rgba(255,205,112,.20) 0 5px,rgba(82,48,22,.16) 5px 9px),
+      linear-gradient(180deg,#9a5b24 0%,#6f3f1b 52%,#3f2714 100%)!important;
+    box-shadow:inset 0 1px 0 rgba(255,232,180,.35),inset 0 -3px 0 rgba(0,0,0,.24),0 5px 14px rgba(0,0,0,.28)!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.62)!important;
+  }
+  .action-grid .icon-btn::after{
+    content:"";
+    position:absolute;
+    left:0;right:0;bottom:0;height:7px;
+    background:repeating-linear-gradient(135deg,rgba(250,204,21,.88) 0 7px,rgba(17,24,39,.92) 7px 14px);
+    opacity:.72;
+    pointer-events:none;
+  }
+  .icon-btn .icon-glyph,.icon-btn .icon-label{position:relative;z-index:1;display:block;}
+  .icon-btn .icon-glyph{font-size:17px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));}
+  .icon-btn .icon-label{font-size:10.5px;line-height:1;font-weight:900;letter-spacing:.01em;white-space:nowrap;}
+  #chatBtn.icon-btn{
+    border-color:rgba(56,189,248,.42)!important;
+    background:
+      linear-gradient(90deg,rgba(0,0,0,.16) 0 9%,transparent 9% 91%,rgba(0,0,0,.16) 91% 100%),
+      repeating-linear-gradient(0deg,rgba(186,230,253,.18) 0 5px,rgba(7,89,133,.18) 5px 9px),
+      linear-gradient(180deg,#38bdf8 0%,#0284c7 58%,#075985 100%)!important;
+  }
+  #pauseBtn.icon-btn{
+    border-color:rgba(203,213,225,.34)!important;
+    background:
+      linear-gradient(90deg,rgba(0,0,0,.18) 0 9%,transparent 9% 91%,rgba(0,0,0,.18) 91% 100%),
+      repeating-linear-gradient(0deg,rgba(226,232,240,.16) 0 5px,rgba(71,85,105,.20) 5px 9px),
+      linear-gradient(180deg,#64748b 0%,#475569 58%,#263244 100%)!important;
+  }
+  .game-stats{
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:8px 12px;
+    width:100%;
+    align-items:start;
+  }
+  .game-stats span{min-width:0;font-size:clamp(12px,3.1vw,15px);line-height:1.16;}
+
+  /* HUD intégré directement dans la zone de gameplay — lisibilité renforcée */
+  .game-frame .game-hud{
+    position:absolute!important;
+    top:10px;
+    left:10px;
+    right:68px;
+    width:auto!important;
+    z-index:5;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    gap:7px 10px!important;
+    padding:9px 12px;
+    box-sizing:border-box;
+    border-radius:14px;
+    background:rgba(2,6,23,.72);
+    border:1px solid rgba(255,255,255,.16);
+    box-shadow:0 7px 22px rgba(0,0,0,.34);
+    backdrop-filter:blur(7px);
+    -webkit-backdrop-filter:blur(7px);
+    pointer-events:none;
+  }
+  .game-frame .game-hud span{
+    min-width:0;
+    color:#dbeafe;
+    font-size:clamp(12px,2.8vw,16px)!important;
+    font-weight:750;
+    line-height:1.12!important;
+    text-align:center;
+    white-space:normal;
+    text-shadow:0 2px 7px rgba(0,0,0,.95);
+  }
+  .game-frame .game-hud b{
+    display:block;
+    margin-top:2px;
+    color:#fff;
+    font-size:clamp(14px,3.15vw,18px)!important;
+    font-weight:950;
+    line-height:1.05;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    text-shadow:0 2px 8px rgba(0,0,0,1);
+  }
+  .game-frame.is-fullscreen .game-hud{display:none!important;}
+  .music-section{display:block;margin-top:2px;}
+  .music-section .music-panel{width:100%;box-sizing:border-box;margin:0!important;}
+  .pill-legend{align-self:stretch;justify-content:flex-start;}
+  .pill-legend .muted{font-size:clamp(11px,3vw,14px)!important;line-height:1.25;}
+  .signature{
+    width:100%!important;
+    box-sizing:border-box!important;
+    text-align:center!important;
+    color:#a7b3c7!important;
+    line-height:1.18!important;
+    margin-top:18px!important;
+    margin-bottom:0!important;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom))!important;
+  }
+  .signature .sig-brand{display:block;color:#f8fafc;font-weight:950;letter-spacing:.55px;font-size:clamp(13px,3.15vw,16px);}
+  .signature .sig-row{width:100%;max-width:680px;margin:3px auto 0;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:clamp(9.8px,2.45vw,12px);color:#a7b3c7;}
+  .signature .sig-row span{white-space:nowrap;min-width:0;}
+  .signature .sig-row b{color:#dbeafe;font-weight:850;}
+
+
+  /* Signature fixe plus visible tout en bas de l'écran */
+  .wrap{padding-bottom:calc(122px + env(safe-area-inset-bottom))!important;}
+  .signature{
+    position:fixed!important;
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    z-index:25!important;
+    margin:0!important;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom))!important;
+    background:linear-gradient(180deg,rgba(3,8,18,.14),rgba(3,8,18,.82) 46%,rgba(3,8,18,.96) 100%)!important;
+    backdrop-filter:blur(6px)!important;
+    -webkit-backdrop-filter:blur(6px)!important;
+    box-shadow:0 -12px 26px rgba(0,0,0,.30)!important;
+    border-top:1px solid rgba(255,255,255,.08)!important;
+  }
+  .signature .sig-brand{
+    color:#ffffff!important;
+    font-size:clamp(16px,4.4vw,20px)!important;
+    font-weight:1000!important;
+    letter-spacing:.8px!important;
+    text-shadow:0 2px 10px rgba(0,0,0,.75)!important;
+    margin-bottom:4px!important;
+  }
+  .signature .sig-row{
+    width:100%!important;
+    max-width:860px!important;
+    margin:0 auto!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+    flex-wrap:wrap!important;
+    font-size:clamp(11px,3.05vw,13px)!important;
+    line-height:1.25!important;
+    color:#d7e3f4!important;
+    text-shadow:0 2px 8px rgba(0,0,0,.72)!important;
+  }
+  .signature .sig-row span{
+    white-space:normal!important;
+    flex:1 1 220px!important;
+  }
+  .signature .sig-row span:first-child{text-align:left!important;}
+  .signature .sig-row span:last-child{text-align:right!important;}
+  .signature .sig-row b{color:#ffffff!important;font-weight:900!important;}
+  @media (max-width:720px), (hover:none) and (pointer:coarse){
+    .wrap{display:flex!important;flex-direction:column!important;gap:14px!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important;}
+    .main-panel{gap:8px;}
+    .action-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 8px;}
+    .action-grid .btn{min-height:34px;padding:6px 8px;border-radius:10px;font-size:clamp(12px,3.35vw,14px);}
+    .action-grid #playBtn{grid-column:1/-1;}
+    .game-stats{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px 8px;}
+    .game-stats span{font-size:clamp(10.5px,2.85vw,13px);}
+    .game-frame .game-hud{
+      top:8px;
+      left:8px;
+      right:58px;
+      gap:5px 6px!important;
+      padding:8px 7px;
+      border-radius:12px;
+      background:rgba(2,6,23,.76);
+    }
+    .game-frame .game-hud span{
+      font-size:clamp(11.5px,3.15vw,14.5px)!important;
+      font-weight:800;
+    }
+    .game-frame .game-hud b{
+      font-size:clamp(13px,3.55vw,16.5px)!important;
+    }
+    .music-panel{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px 7px!important;padding:6px 10px!important;border-radius:18px!important;}
+    .music-status,.music-volume{grid-column:1/-1!important;}
+    .music-btn{min-height:28px;padding:5px 7px;border-radius:999px;font-size:clamp(11px,2.9vw,13px);}
+    .signature .sig-row{font-size:clamp(9px,2.4vw,11.5px);gap:8px;}
+  }
+
+
+  /* ===== CR3@TIX V3.5.1 — INTERFACE 100 % ICÔNES =====
+     Aucun changement de gameplay : uniquement l'apparence des commandes. */
+  button,
+  .btn,
+  .music-btn,
+  .first-play-btn,
+  .frame-fs-btn,
+  .fs-back,
+  .fs-btn{
+    appearance:none!important;
+    -webkit-appearance:none!important;
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    text-shadow:none!important;
+    padding:0!important;
+    color:inherit;
+    cursor:pointer;
+    min-width:44px;
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+    font-size:30px;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+    transition:transform .13s ease, opacity .13s ease, filter .13s ease;
+  }
+
+  button:hover,
+  .btn:hover,
+  .music-btn:hover,
+  .first-play-btn:hover,
+  .frame-fs-btn:hover,
+  .fs-back:hover,
+  .fs-btn:hover{
+    filter:drop-shadow(0 4px 7px rgba(0,0,0,.55)) brightness(1.12);
+  }
+
+  button:active,
+  .btn:active,
+  .music-btn:active,
+  .first-play-btn:active,
+  .frame-fs-btn:active,
+  .fs-back:active,
+  .fs-btn:active{
+    transform:scale(.86)!important;
+  }
+
+  button:focus-visible,
+  .btn:focus-visible,
+  .music-btn:focus-visible,
+  .first-play-btn:focus-visible,
+  .frame-fs-btn:focus-visible,
+  .fs-back:focus-visible,
+  .fs-btn:focus-visible{
+    outline:2px solid rgba(56,189,248,.95)!important;
+    outline-offset:4px;
+  }
+
+  button:disabled,
+  .btn:disabled{
+    opacity:.32!important;
+    filter:grayscale(1)!important;
+    cursor:not-allowed!important;
+  }
+
+  .action-grid{
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    gap:6px!important;
+    align-items:center!important;
+  }
+  .action-grid .btn,
+  .action-grid .icon-btn,
+  .action-grid #playBtn{
+    grid-column:auto!important;
+    min-width:44px!important;
+    min-height:48px!important;
+    width:100%!important;
+    padding:0!important;
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    overflow:visible!important;
+  }
+  .action-grid .icon-btn::after{display:none!important;content:none!important;}
+  .icon-btn .icon-label{display:none!important;}
+  .icon-btn .icon-glyph,
+  .icon-only-btn .icon-glyph{
+    display:block!important;
+    font-size:30px!important;
+    line-height:1!important;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,.5))!important;
+  }
+
+  #playBtn{font-size:32px!important;}
+  #installPwaZone{
+    grid-column:1/-1!important;
+    justify-content:center!important;
+    margin-top:0!important;
+  }
+  #installPwaBtn{
+    width:52px!important;
+    min-width:52px!important;
+    font-size:30px!important;
+  }
+  #installPwaStatus{
+    max-width:min(78vw,520px);
+  }
+
+  .first-play-btn{font-size:38px!important;min-width:54px!important;min-height:54px!important;}
+  .frame-fs-btn{font-size:30px!important;width:48px!important;height:48px!important;}
+  .game-frame.is-fullscreen .fs-back{
+    display:flex!important;
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+    width:48px!important;
+    height:48px!important;
+    font-size:32px!important;
+  }
+  .fs-btn{
+    min-width:46px!important;
+    width:46px!important;
+    height:46px!important;
+    padding:0!important;
+    font-size:26px!important;
+    background:transparent!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+  }
+  .fs-btn.play,.fs-btn.stop,.fs-btn.chat{background:transparent!important;color:#fff!important;}
+
+  .music-panel{align-items:center!important;}
+  .music-btn{
+    min-width:46px!important;
+    width:46px!important;
+    min-height:46px!important;
+    height:46px!important;
+    padding:0!important;
+    font-size:26px!important;
+    background:transparent!important;
+    box-shadow:none!important;
+  }
+  .music-btn.primary,.music-btn.stop{background:transparent!important;color:var(--fg)!important;}
+
+  #saveNameBtn{font-size:29px!important;min-width:48px!important;min-height:48px!important;}
+
+  @media (max-width:520px){
+    .action-grid{grid-template-columns:repeat(5,minmax(44px,1fr))!important;}
+    .icon-btn .icon-glyph,.icon-only-btn .icon-glyph{font-size:28px!important;}
+    #playBtn{font-size:30px!important;}
+    .music-btn{font-size:24px!important;}
+  }
+
+  /* Correctifs finaux : aucune forme de bouton visible sur Pause / Chat,
+     et différenciation claire entre commandes du jeu et lecteur musical. */
+  #pauseBtn,
+  #chatBtn,
+  #onlineBtn,
+  #setNameBtn,
+  #playBtn,
+  #installPwaBtn,
+  #saveNameBtn,
+  #firstPlayBtn,
+  #frameFullscreenBtn,
+  #frameExitBtn,
+  #fsPauseBtn,
+  #fsChatBtn,
+  #fsLeaderboardBtn,
+  #musicPrevBtn,
+  #musicPlayBtn,
+  #musicStopBtn,
+  #musicNextBtn,
+  #fsPrevMusicBtn,
+  #fsPlayMusicBtn,
+  #fsStopMusicBtn,
+  #fsNextMusicBtn{
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    text-shadow:none!important;
+    backdrop-filter:none!important;
+  }
+  #pauseBtn::after,
+  #chatBtn::after{
+    display:none!important;
+    content:none!important;
+  }
+  #pauseBtn .icon-glyph,
+  #chatBtn .icon-glyph,
+  #onlineBtn .icon-glyph,
+  #setNameBtn .icon-glyph,
+  #playBtn .icon-glyph{
+    display:block!important;
+  }
+
+  /* Jeu : teintes dédiées */
+  #playBtn,
+  #firstPlayBtn,
+  #pauseBtn,
+  #fsPauseBtn{color:#f59e0b!important;}
+  #setNameBtn,
+  #saveNameBtn{color:#60a5fa!important;}
+  #chatBtn,
+  #fsChatBtn{color:#38bdf8!important;}
+  #onlineBtn,
+  #fsLeaderboardBtn{color:#facc15!important;}
+  #installPwaBtn{color:#22c55e!important;}
+  #frameFullscreenBtn,
+  #frameExitBtn{color:#e5e7eb!important;}
+
+  /* Musique : autre langage visuel */
+  #musicPrevBtn,
+  #musicNextBtn,
+  #fsPrevMusicBtn,
+  #fsNextMusicBtn{color:#f8fafc!important;}
+  #musicPlayBtn,
+  #fsPlayMusicBtn{color:#22c55e!important;}
+  #musicStopBtn,
+  #fsStopMusicBtn{color:#fb923c!important;}
+
+
+  /* Lecteur musical : icône + nom de la fonction */
+  .music-panel .music-labeled-btn{
+    width:auto!important;
+    min-width:0!important;
+    height:auto!important;
+    min-height:44px!important;
+    padding:7px 9px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:5px!important;
+    font-size:inherit!important;
+    white-space:nowrap!important;
+  }
+  .music-panel .music-labeled-btn .music-btn-icon{
+    font-size:21px!important;
+    line-height:1!important;
+    flex:0 0 auto!important;
+  }
+  .music-panel .music-labeled-btn .music-btn-label{
+    display:inline-block!important;
+    font-size:clamp(9px,2.35vw,12px)!important;
+    line-height:1!important;
+    font-weight:850!important;
+    letter-spacing:.01em!important;
+  }
+  @media (max-width:420px){
+    .music-panel .music-labeled-btn{
+      padding:6px 4px!important;
+      gap:3px!important;
+    }
+    .music-panel .music-labeled-btn .music-btn-icon{font-size:18px!important;}
+    .music-panel .music-labeled-btn .music-btn-label{font-size:8.5px!important;}
+  }
+
+  #playBtn .icon-glyph,
+  #firstPlayBtn,
+  #fsPauseBtn,
+  #pauseBtn .icon-glyph{filter:drop-shadow(0 0 10px rgba(245,158,11,.28)) drop-shadow(0 3px 4px rgba(0,0,0,.5))!important;}
+  /* Correctif ultra-ciblé : plus aucune plaque rayée derrière Pause / Chat */
+  #pauseBtn,
+  #chatBtn,
+  #pauseBtn.icon-only-btn,
+  #chatBtn.icon-only-btn,
+  .action-grid #pauseBtn,
+  .action-grid #chatBtn{
+    background:none!important;
+    background-image:none!important;
+    border:none!important;
+    box-shadow:none!important;
+    outline:none!important;
+    overflow:visible!important;
+  }
+  #pauseBtn::before,
+  #pauseBtn::after,
+  #chatBtn::before,
+  #chatBtn::after,
+  .action-grid #pauseBtn::before,
+  .action-grid #pauseBtn::after,
+  .action-grid #chatBtn::before,
+  .action-grid #chatBtn::after{
+    display:none!important;
+    content:none!important;
+    background:none!important;
+  }
+  #pauseBtn .icon-label,
+  #chatBtn .icon-label{display:none!important;}
+  #pauseBtn .icon-glyph,
+  #chatBtn .icon-glyph{
+    font-size:30px!important;
+    line-height:1!important;
+    display:block!important;
+  }
+  #chatBtn .icon-glyph,
+  #fsChatBtn{filter:drop-shadow(0 0 10px rgba(56,189,248,.24)) drop-shadow(0 3px 4px rgba(0,0,0,.5))!important;}
+  #onlineBtn .icon-glyph,
+  #fsLeaderboardBtn{filter:drop-shadow(0 0 10px rgba(250,204,21,.25)) drop-shadow(0 3px 4px rgba(0,0,0,.5))!important;}
+
+</style>
+
+
+<style id="signature-bottom-fix">
+  .wrap{padding-bottom:calc(122px + env(safe-area-inset-bottom))!important;}
+  .signature{position:fixed!important;left:0!important;right:0!important;bottom:0!important;z-index:25!important;margin:0!important;padding:10px 14px calc(10px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,rgba(3,8,18,.14),rgba(3,8,18,.82) 46%,rgba(3,8,18,.96) 100%)!important;backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important;box-shadow:0 -12px 26px rgba(0,0,0,.30)!important;border-top:1px solid rgba(255,255,255,.08)!important;}
+  .signature .sig-brand{color:#ffffff!important;font-size:clamp(17px,4.8vw,22px)!important;font-weight:1000!important;letter-spacing:.85px!important;text-shadow:0 2px 10px rgba(0,0,0,.75)!important;margin-bottom:5px!important;}
+  .signature .sig-row{width:100%!important;max-width:860px!important;margin:0 auto!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;flex-wrap:wrap!important;font-size:clamp(11.8px,3.22vw,13.8px)!important;line-height:1.28!important;color:#d7e3f4!important;text-shadow:0 2px 8px rgba(0,0,0,.72)!important;}
+  .signature .sig-row span{white-space:normal!important;flex:1 1 220px!important;}
+  .signature .sig-row span:first-child{text-align:left!important;}
+  .signature .sig-row span:last-child{text-align:right!important;}
+  .signature .sig-row b{color:#ffffff!important;font-weight:900!important;}
+  @media (max-width:720px), (hover:none) and (pointer:coarse){
+    .wrap{padding-bottom:calc(132px + env(safe-area-inset-bottom))!important;}
+    .signature{padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important;}
+    .signature .sig-brand{font-size:clamp(16px,4.9vw,19px)!important;}
+    .signature .sig-row{font-size:clamp(11.2px,3.12vw,13.2px)!important;gap:10px!important;}
+  }
+</style>
+
+<style id="install-cta-prominent-fix">
+  /* CTA d'installation éphémère : visible, centré et hors des commandes du jeu */
+  #installPwaZone.install-cta{
+    position:relative!important;
+    z-index:8!important;
+    width:min(92vw,420px)!important;
+    margin:-4px auto 8px!important;
+    padding:0!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:5px!important;
+    grid-column:auto!important;
+  }
+  #installPwaZone.install-cta.is-hidden{display:none!important;}
+  #installPwaBtn{
+    appearance:none!important;
+    -webkit-appearance:none!important;
+    width:100%!important;
+    min-height:54px!important;
+    padding:10px 18px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:10px!important;
+    border:1px solid rgba(255,255,255,.20)!important;
+    border-radius:18px!important;
+    background:linear-gradient(180deg,#2fd96b 0%,#16a34a 58%,#0f7a37 100%)!important;
+    color:#ffffff!important;
+    box-shadow:
+      0 0 0 1px rgba(34,197,94,.16),
+      0 10px 28px rgba(22,163,74,.34),
+      inset 0 1px 0 rgba(255,255,255,.24)!important;
+    font-size:clamp(16px,4.2vw,19px)!important;
+    font-weight:950!important;
+    line-height:1!important;
+    letter-spacing:.01em!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.35)!important;
+    cursor:pointer!important;
+    overflow:hidden!important;
+    animation:installCtaPulse 2.4s ease-in-out infinite!important;
+  }
+  #installPwaBtn:hover{
+    filter:brightness(1.08)!important;
+    transform:translateY(-1px)!important;
+  }
+  #installPwaBtn:active{
+    transform:scale(.97)!important;
+    animation:none!important;
+  }
+  #installPwaBtn .install-cta-icon{
+    display:inline-block!important;
+    font-size:28px!important;
+    line-height:1!important;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.32))!important;
+  }
+  #installPwaBtn .install-cta-text{
+    display:inline-block!important;
+    white-space:nowrap!important;
+  }
+  #installPwaStatus{
+    display:block!important;
+    width:auto!important;
+    max-width:96%!important;
+    margin:0!important;
+    padding:4px 10px!important;
+    border:0!important;
+    border-radius:999px!important;
+    background:rgba(3,8,18,.68)!important;
+    color:#dcfce7!important;
+    font-size:clamp(10.5px,2.8vw,12px)!important;
+    font-weight:700!important;
+    line-height:1.2!important;
+    text-align:center!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.55)!important;
+  }
+  @keyframes installCtaPulse{
+    0%,100%{box-shadow:0 0 0 1px rgba(34,197,94,.16),0 10px 28px rgba(22,163,74,.30),inset 0 1px 0 rgba(255,255,255,.24)}
+    50%{box-shadow:0 0 0 5px rgba(34,197,94,.10),0 12px 34px rgba(22,163,74,.42),inset 0 1px 0 rgba(255,255,255,.30)}
+  }
+  @media (max-width:520px){
+    #installPwaZone.install-cta{
+      width:min(90vw,360px)!important;
+      margin:-2px auto 7px!important;
+    }
+    #installPwaBtn{
+      min-height:50px!important;
+      padding:9px 14px!important;
+      border-radius:16px!important;
+      font-size:clamp(15px,4vw,17px)!important;
+    }
+    #installPwaBtn .install-cta-icon{font-size:25px!important;}
+    #installPwaStatus{font-size:clamp(10px,2.65vw,11px)!important;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #installPwaBtn{animation:none!important;}
+  }
+</style>
+
+<style id="music-panel-dark-background">
+  /* Lecteur musical : fond sombre proche du gameplay pour améliorer la lisibilité */
+  .music-section .music-panel{
+    background:linear-gradient(180deg,rgba(5,11,22,.94),rgba(7,17,35,.92))!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:18px!important;
+    box-shadow:
+      0 12px 32px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.05)!important;
+    backdrop-filter:blur(8px)!important;
+    -webkit-backdrop-filter:blur(8px)!important;
+    padding:10px 12px!important;
+  }
+  .music-section .music-status,
+  .music-section .music-volume{
+    color:#e5e7eb!important;
+    text-shadow:0 2px 8px rgba(0,0,0,.85)!important;
+  }
+  .music-section .music-btn-label{
+    color:#f8fafc!important;
+    text-shadow:0 2px 7px rgba(0,0,0,.9)!important;
+  }
+  @media (max-width:520px){
+    .music-section .music-panel{
+      padding:10px 11px!important;
+      border-radius:16px!important;
+    }
+  }
+</style>
+
+<style id="legend-dark-readable">
+  /* Légende bonus/malus : fond sombre et texte plus lisible */
+  .pill.pill-legend{
+    width:100%!important;
+    box-sizing:border-box!important;
+    margin-top:10px!important;
+    padding:11px 13px!important;
+    background:linear-gradient(180deg,rgba(5,11,22,.94),rgba(7,17,35,.92))!important;
+    border:1px solid rgba(255,255,255,.10)!important;
+    border-radius:16px!important;
+    box-shadow:0 10px 28px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.05)!important;
+    backdrop-filter:blur(8px)!important;
+    -webkit-backdrop-filter:blur(8px)!important;
+    justify-content:flex-start!important;
+  }
+  .pill.pill-legend .muted{
+    display:block!important;
+    width:100%!important;
+    color:#f8fafc!important;
+    opacity:1!important;
+    font-size:clamp(14.2px,3.55vw,16.8px)!important;
+    line-height:1.35!important;
+    text-shadow:0 2px 8px rgba(0,0,0,.9)!important;
+    letter-spacing:.1px!important;
+  }
+  @media (max-width:520px){
+    .pill.pill-legend{
+      padding:10px 11px!important;
+      border-radius:15px!important;
+    }
+    .pill.pill-legend .muted{
+      font-size:clamp(13.8px,3.75vw,15.4px)!important;
+      line-height:1.38!important;
+    }
+  }
+</style>
+
+</head>
+<body>
+  <audio id="userMusic" preload="metadata"></audio>
+  <div class="top-banner">
+    <img src="game/1000933863.png" alt="Bannière Cariste Runner">
+  </div>
+  <div class="wrap">
+    <div class="install-zone install-cta" id="installPwaZone">
+      <button class="btn install" id="installPwaBtn" type="button" aria-label="Installer l’application" title="Installer l’application"><span class="install-cta-icon" aria-hidden="true">📲</span><span class="install-cta-text">Installer l’application</span></button>
+      <span class="install-status" id="installPwaStatus">Installation disponible • le bouton disparaît après installation.</span>
+    </div>
+    <section class="main-panel" aria-label="Accueil du jeu">
+      <div class="action-grid" aria-label="Actions principales">
+        <button class="btn icon-btn" id="setNameBtn" type="button" aria-label="Changer de pseudo" title="Changer de pseudo"><span class="icon-glyph" aria-hidden="true">👤</span><span class="icon-label">Pseudo</span></button>
+        <button class="btn icon-only-btn" id="playBtn" type="button" disabled aria-label="Jouer ou rejouer" title="Jouer ou rejouer"><span class="icon-glyph" aria-hidden="true">🕹️</span></button>
+        <button class="btn secondary icon-only-btn" id="pauseBtn" type="button" aria-label="Mettre en pause" title="Mettre en pause"><span class="icon-glyph" aria-hidden="true">⏸️</span></button>
+        <button class="btn icon-btn" id="onlineBtn" type="button" aria-label="Classement en ligne" title="Classement en ligne"><span class="icon-glyph" aria-hidden="true">🏆</span><span class="icon-label">Top</span></button>
+        <button class="btn icon-only-btn" id="chatBtn" type="button" aria-label="Chat de groupe" title="Chat de groupe"><span class="icon-glyph" aria-hidden="true">💬</span></button>
+      </div>
+
+      <div class="progress" title="Progression du niveau">
+        <div class="bar" id="lvlBar"></div>
+      </div>
+    </section>
+
+    <div class="game-frame" id="gameFrame">
+      <canvas id="game" width="960" height="320" aria-label="Cariste Runner"></canvas>
+      <div class="scores game-stats game-hud" aria-label="Informations de partie">
+        <span>Joueur : <b id="playerName" class="muted">—</b></span>
+        <span>Score : <b id="score">0</b></span>
+        <span>Meilleur : <b id="best">0</b></span>
+        <span>Niveau : <b id="level">1</b></span>
+        <span>Vitesse : <b id="speed">1.00x</b></span>
+      </div>
+      <div class="first-play-overlay" id="firstPlayOverlay" aria-label="Démarrer la première partie">
+        <div class="first-play-card">
+          <div class="first-play-title">Prêt à charger ?</div>
+          <p class="first-play-text">Appuie sur Jouer quand tu es prêt. Le tactile servira ensuite à sauter.</p>
+          <button class="first-play-btn icon-only-btn" id="firstPlayBtn" type="button" aria-label="Jouer" title="Jouer">🕹️</button>
+        </div>
+      </div>
+      <button class="frame-fs-btn" id="frameFullscreenBtn" type="button" aria-label="Jouer en plein écran paysage" title="Plein écran paysage">⛶</button>
+      <button class="fs-back" id="frameExitBtn" type="button" aria-label="Retour au mode portrait" title="Retour au mode portrait">←</button>
+      <div class="fs-hud" aria-label="Informations de partie">
+        <span class="fs-chip">Score&nbsp;: <b id="fsScore">0</b></span>
+        <span class="fs-chip">Meilleur&nbsp;: <b id="fsBest">0</b></span>
+        <span class="fs-chip">Niveau&nbsp;: <b id="fsLevel">1</b></span>
+        <span class="fs-chip">Vitesse&nbsp;: <b id="fsSpeed">1.00x</b></span>
+      </div>
+      <div class="fs-notice" id="fsNotice"></div>
+      <div class="fs-help" id="fsHelp">Active la rotation automatique de l’écran du téléphone, puis tourne ton smartphone pour jouer en paysage.</div>
+      <div class="fs-actions" aria-label="Contrôles plein écran">
+        <button class="fs-btn" id="fsPrevMusicBtn" type="button" aria-label="Musique précédente" title="Musique précédente">⏮️</button>
+        <button class="fs-btn play" id="fsPlayMusicBtn" type="button" aria-label="Lire la musique" title="Lire la musique">▶️</button>
+        <button class="fs-btn stop" id="fsStopMusicBtn" type="button" aria-label="Arrêter la musique" title="Arrêter la musique">⏹️</button>
+        <button class="fs-btn" id="fsNextMusicBtn" type="button" aria-label="Musique suivante" title="Musique suivante">⏭️</button>
+        <label class="fs-volume" aria-label="Volume musique">🔊 <input id="fsMusicVolume" type="range" min="0" max="100" value="70" /></label>
+        <button class="fs-btn" id="fsPauseBtn" type="button" aria-label="Pause ou reprendre" title="Pause ou reprendre">⏸️</button>
+        <button class="fs-btn chat" id="fsChatBtn" type="button" aria-label="Chat de groupe" title="Chat de groupe">💬</button>
+        <button class="fs-btn" id="fsLeaderboardBtn" type="button" aria-label="Classement" title="Classement">🏆</button>
+      </div>
+    </div>
+
+
+
+    <section class="music-section" aria-label="Lecteur de musique">
+<div class="pill music-panel" role="group" aria-label="Musique personnelle">
+  <input type="file" id="musicPicker" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav,.flac,.opus,.webm" multiple />
+  <input type="file" id="musicFolderPicker" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav,.flac,.opus,.webm" multiple webkitdirectory directory />
+  <span id="musicStatus" class="music-status">🎵 Ma musique : aucun fichier</span>
+  <label class="music-volume" for="musicVolume">🔊 Volume <input id="musicVolume" type="range" min="0" max="100" value="70" /></label>
+  <button class="music-btn music-labeled-btn" id="musicPrevBtn" type="button" aria-label="Musique précédente" title="Musique précédente"><span class="music-btn-icon" aria-hidden="true">⏮️</span><span class="music-btn-label">Précédent</span></button>
+  <button class="music-btn primary music-labeled-btn" id="musicPlayBtn" type="button" aria-label="Lire la musique" title="Lire la musique"><span class="music-btn-icon" aria-hidden="true">▶️</span><span class="music-btn-label">Lecture</span></button>
+  <button class="music-btn stop music-labeled-btn" id="musicStopBtn" type="button" aria-label="Arrêter la musique" title="Arrêter la musique"><span class="music-btn-icon" aria-hidden="true">⏹️</span><span class="music-btn-label">Stop</span></button>
+  <button class="music-btn music-labeled-btn" id="musicNextBtn" type="button" aria-label="Musique suivante" title="Musique suivante"><span class="music-btn-icon" aria-hidden="true">⏭️</span><span class="music-btn-label">Suivant</span></button>
+</div>
+    </section>
+
+    <div class="pill pill-legend"><span class="muted">🎁 Bonus rare (+100) | 💀 Malus suspendu (−50) | 🟨 Palette d’or (+200) | 🛢️ Ralenti −40% (3s) | 🪖 Immunité (5s)</span></div>
+
+    <div class="signature" aria-label="Signature CR3ATIX">
+      <div class="sig-brand">CR3ATIX™</div>
+      <div class="sig-row"><span>Créé par <b>Kévin Labens</b></span><span>Version finale propre — Gameplay V3.7.2</span></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" style="pointer-events:none">
+    <div class="msg" id="toastMsg">Niveau +1</div>
+  </div>
+
+  <div class="modal" id="nameModal" role="dialog" aria-modal="true" aria-label="Choisir un pseudo">
+    <div class="box">
+      <h3 style="margin:0 0 10px;">Choisir un pseudo</h3>
+      <p class="muted" style="margin:0 0 10px;">Entre un pseudo unique pour enregistrer ton meilleur score en ligne.</p>
+      <div class="field">
+        <input class="input" type="text" id="nameInput" placeholder="Ex : Kévin expédition" maxlength="20" autocomplete="nickname" />
+        <button class="btn icon-only-btn" id="saveNameBtn" type="button" aria-label="Valider le pseudo" title="Valider le pseudo">✅</button>
+      </div>
+      <div class="name-status" id="nameStatus" aria-live="polite">Le pseudo sera vérifié en ligne avant validation.</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+const OIL_BARREL_OFFSET = 180; // Ecart en px entre palettes et bidon d'huile
+
+  const canvas = $('#game');
+  const gameFrame = $('#gameFrame');
+  const ctx = canvas.getContext('2d');
+
+  // ===== Audio (beep / crash / bonus / malus) =====
+  let audioCtx=null;
+  function ensureAudio(){try{if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume();}catch{}}
+  function beep(){if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='square'; o.frequency.value=880; g.gain.setValueAtTime(0.0001,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.06,audioCtx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.09); o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.1)}
+  function crash(){if(!audioCtx) return; const g=audioCtx.createGain(); g.gain.setValueAtTime(0.18,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.35); const n=audioCtx.createBufferSource(); const sr=audioCtx.sampleRate,len=sr*0.28,buf=audioCtx.createBuffer(1,len,sr),d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len); n.buffer=buf; const bp=audioCtx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=280; bp.Q.value=0.7; n.connect(bp).connect(g).connect(audioCtx.destination); n.start() }
+  function giftSound(){
+    if(!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    const now = audioCtx.currentTime;
+    o.type = 'sine';
+    o.frequency.setValueAtTime(523.25, now);
+    o.frequency.linearRampToValueAtTime(659.25, now + 0.18);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.1, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(now); o.stop(now + 0.36);
+  }
+  function malusSound(){
+    if(!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    const now = audioCtx.currentTime;
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(440, now);
+    o.frequency.linearRampToValueAtTime(196, now + 0.22);
+    g.gain.setValueAtTime(0.12, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(now); o.stop(now + 0.26);
+  }
+  window.addEventListener('pointerdown',ensureAudio,{once:true});
+  window.addEventListener('keydown',ensureAudio,{once:true});
+
+  // ===== Persistence =====
+  const LS_PLAYER='cariste_player'; const LS_BEST_PREFIX='cariste_best_';
+  // URL API de scores / pseudos
+  const SCORE_API_URL = "https://script.google.com/macros/s/AKfycbw7DhCZAIBRf3200soATYvJHH0ypodz5dNQaltUk86bfTLWPWv7N0y3gDOmivHiQnQ/exec";
+  const CHAT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzhla8VlrjSomRZaI596ezb0OM887q8NRqBcI34-Pq9iBTL11tjFgf1zd8hSH6bvtkd/exec";
+  const getPlayer=()=> (localStorage.getItem(LS_PLAYER)||'').trim();
+  const setPlayer=n=> localStorage.setItem(LS_PLAYER,n);
+  const getBestFor=n=> Number(localStorage.getItem(LS_BEST_PREFIX+n)||0);
+  const setBestFor=(n,s)=> localStorage.setItem(LS_BEST_PREFIX+n,String(s));
+  // ===== Banque de messages =====
+  const LOSE_MESSAGES = [
+    "Bouhh… même un escargot aurait survécu plus longtemps.",
+    "Tu joues ou tu fais un stage de cascadeur raté ?",
+    "Bravo, t’as gagné… un aller simple pour la honte.",
+    "Les palettes t’applaudissent… pour ton crash.",
+    "On dirait que ton cariste a démissionné.",
+    "Game Over sponsorisé par la maladresse.",
+    "Même le tutoriel était plus impressionnant.",
+    "Ton score fait rire le classement.",
+    "C’était beau… enfin, surtout la chute.",
+    "Tu viens d’inventer le concept du “fast game over”.",
+    "Tes réflexes étaient en RTT ?",
+    "Bravo, champion de la gamelle !",
+    "Le gyrophare s’est éteint par pitié.",
+    "Même la musique a honte de toi.",
+    "Félicitations, ton score est officiellement un gag.",
+    "Tu viens d’être élu employé du mois… du néant.",
+    "On peut appeler ça une performance… catastrophique.",
+    "Tu t’es fait manger par les palettes.",
+    "Tu veux qu’on rajoute des petites roues stabilisatrices ?",
+    "Même la physique du jeu s’est moquée de toi.",
+    "Ton pseudo brille en rouge dans le classement : danger public.",
+    "Tu viens de signer un CDI en échec.",
+    "L’échec est un art… et toi, t’es un artiste.",
+    "Game Over express : livraison gratuite.",
+    "Si on comptait les défaites, tu serais premier.",
+    "Tes points sont partis en vacances.",
+    "Même les malus ont eu peur de ton niveau.",
+    "Le cariste pleure dans son casque.",
+    "Tu viens de battre ton record… de nullité.",
+    "Bravo ! On envoie ton score au musée des ratés."
+  ];
+
+  const WIN_MESSAGES = [
+    "Wouah, enfin quelque chose à montrer à ta mère !",
+    "Félicitations, tu viens de faire un miracle.",
+    "Les palettes s’inclinent devant ta gloire.",
+    "Ton joystick a transpiré mais ça valait le coup.",
+    "Tu viens de pulvériser ton ancien toi.",
+    "Même le gyrophare danse de joie.",
+    "Ton record précédent s’est enfui en pleurant.",
+    "Bravo, promotion en “Cariste niveau 2” !",
+    "Tu viens de gagner le respect des palettes.",
+    "Tes doigts ont enfin trouvé le mode “compétent”.",
+    "T’as battu ton record ! On appelle ça : la légende locale.",
+    "Même le jeu ne croyait pas en toi.",
+    "Les autres joueurs vont avoir peur de ton pseudo.",
+    "Bravo, tu passes du rang de boulet à celui de champion.",
+    "Ton ancien score a rage quit.",
+    "Chapeau, t’as enfin prouvé que tu sais jouer.",
+    "Même les malus se sont inclinés.",
+    "La victoire te va mieux que la honte.",
+    "T’es passé de “touriste” à “boss du quai”.",
+    "On t’attend pour signer ton autographe.",
+    "Félicitations, tu es la fierté des palettes.",
+    "Les autres caristes murmurent ton nom.",
+    "Tu viens d’inventer le “style cariste légendaire”.",
+    "Ton cariste a sorti le champagne.",
+    "Même le classement en ligne t’applaudit.",
+    "Bravo, tu deviens officiellement une légende… du dépôt.",
+    "La victoire est à toi, profite avant de rechuter.",
+    "Tes points ont pris l’ascenseur express.",
+    "Ton ancien record est maintenant obsolète.",
+    "Tu viens d’écrire l’histoire : “Cariste Runner, chapitre toi”."
+  ];
+
+  function randomItem(arr){ return arr[(Math.random()*arr.length)|0]; }
+
+  function nameOrDefault(){
+    try{
+      const n = (state.playerName || getPlayer() || '').trim();
+      return n || 'Joueur';
+    }catch(e){
+      return 'Joueur';
+    }
+  }
+  function personalizeMessage(msg, name){
+    try{
+      const who = (name || nameOrDefault()).trim();
+      if(!who) return msg;
+      if (/{name}/i.test(msg)) return msg.replace(/{name}/gi, who);
+      // par défaut: on préfixe proprement avec le pseudo
+      return who + " — " + msg;
+    }catch(e){
+      return (name || 'Joueur') + " — " + msg;
+    }
+  }
+
+
+
+  // ===== DPI fit =====
+  let scale=1;
+  function isFullscreenGame(){
+    return !!(gameFrame && gameFrame.classList.contains('is-fullscreen'));
+  }
+  function fit(){
+    // On garde les coordonnées du jeu en pixels CSS pour éviter l'effet trop petit sur Android installé.
+    // En mode plein écran, le canvas prend réellement toute la zone disponible.
+    const cssW=Math.max(1, Math.round(canvas.clientWidth || window.innerWidth || 960));
+    const cssH=isFullscreenGame()
+      ? Math.max(1, Math.round(canvas.clientHeight || window.innerHeight || 320))
+      : 450;
+    canvas.style.height=cssH+'px';
+    canvas.width=cssW;
+    canvas.height=cssH;
+    scale=1;
+    if(!state.playing && !state.gameover){ player.y=ground()-player.h; draw(); }
+  }
+  window.addEventListener('resize',fit);
+  window.addEventListener('orientationchange',()=>setTimeout(fit,220));
+  setTimeout(fit,0);
+
+  // ===== Constantes gameplay =====
+  const GROUND_Y=0.83, GRAVITY=2400, JUMP_V=900, BASE_SPEED=300;
+  const MIN_GAP_FLOOR=240;
+
+  const player={x:110,y:0,w:84,h:62,vy:0,onGround:true,wheel:0,beacon:0,jumpCount:0,maxJumps:2};
+  const realisticForkliftImg = new Image();
+  realisticForkliftImg.decoding = 'async';
+  realisticForkliftImg.src = './game/forklift-realistic.png';
+  const palletLowImg = new Image();
+  palletLowImg.decoding = 'async';
+  palletLowImg.src = './game/pallet-low-realistic.png';
+  const palletStackedImg = new Image();
+  palletStackedImg.decoding = 'async';
+  palletStackedImg.src = './game/pallet-stacked-realistic.png';
+  const hitbox=()=>({x:player.x+10*scale,y:player.y+8*scale,w:player.w-20*scale,h:player.h-12*scale});
+
+  const state={playing:false,paused:false,gameover:false,level:1,obstacles:[],score:0,best:0,speedMul:1,progress:0,target:0,time:0,tLast:performance.now(),playerName:getPlayer()};
+
+  // === BONUS CADEAUX (+100) — rares
+  const bonuses = []; // {x,y,w,h,taken:false}
+  let lastBonusAt = -999;
+  const BONUS_COOLDOWN = 18;
+  const BONUS_SPAWN_CHANCE = 0.08;
+  const BONUS_MAX_ACTIVE = 1;
+
+  // === MALUS TÊTE DE MORT (-50) — suspendu
+  const maluses = []; // {x,y,w,h,taken:false}
+  let lastMalusAt = -999;
+  const MALUS_COOLDOWN = 14;
+  const MALUS_SPAWN_CHANCE = 0.05; // 5% par fenêtre de spawn
+  const MALUS_SAFE_PAD_LEFT = 100;  // zone sans palettes autour du malus
+  const MALUS_SAFE_PAD_RIGHT = 160;
+  // === PALETTE EN OR (+200) — suspendue
+  const golds = []; let lastGoldAt = -999;
+  const GOLD_COOLDOWN = 16; const GOLD_SPAWN_CHANCE = 0.05; const GOLD_MAX_ACTIVE = 1;
+
+  // === BIDON D’HUILE (ralenti 3s) — au sol
+  const oils = []; let lastOilAt = -999;
+  const OIL_COOLDOWN = 12; const OIL_SPAWN_CHANCE = 0.05; const OIL_MAX_ACTIVE = 1;
+
+  // === CASQUE (immunité 5s) — suspendu
+  const helmets = []; let lastHelmetAt = -999;
+  const HELMET_COOLDOWN = 20; const HELMET_SPAWN_CHANCE = 0.04; const HELMET_MAX_ACTIVE = 1;
+
+  // Effets temporaires
+  let slowUntil = 0; // state.time jusqu'à
+  let invUntil  = 0; // state.time jusqu'à
+
+
+  // UI refs
+  const scoreEl=$('#score'), bestEl=$('#best'), speedEl=$('#speed'), levelEl=$('#level');
+  const playBtn=$('#playBtn'), pauseBtn=$('#pauseBtn');
+  const nameModal=$('#nameModal'), nameInput=$('#nameInput'), saveNameBtn=$('#saveNameBtn'), setNameBtn=$('#setNameBtn'), nameStatus=$('#nameStatus');
+
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  const VIEWPORT_LOCK = 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover';
+  function lockMobileViewport(){
+    try{ if(viewportMeta) viewportMeta.setAttribute('content', VIEWPORT_LOCK); }catch(e){}
+  }
+  lockMobileViewport();
+  const playerNameEl=$('#playerName'); const lvlBar=$('#lvlBar');
+  const toast=$('#toast'), toastMsg=$('#toastMsg');
+  const frameFullscreenBtn=$('#frameFullscreenBtn'), frameExitBtn=$('#frameExitBtn'), fsHelp=$('#fsHelp'), fsNotice=$('#fsNotice');
+  const fsScoreEl=$('#fsScore'), fsBestEl=$('#fsBest'), fsLevelEl=$('#fsLevel'), fsSpeedEl=$('#fsSpeed');
+  const fsPauseBtn=$('#fsPauseBtn'), fsLeaderboardBtn=$('#fsLeaderboardBtn');
+  const firstPlayOverlay=$('#firstPlayOverlay'), firstPlayBtn=$('#firstPlayBtn');
+  let firstManualStartDone=false;
+
+  function setPauseButtonVisual(){
+    if(!pauseBtn) return;
+    const paused = !!state.paused;
+    const icon = paused ? '🕹️' : '⏸️';
+    const label = paused ? 'Reprendre' : 'Pause';
+    if(pauseBtn.classList && pauseBtn.classList.contains('icon-only-btn')){
+      pauseBtn.innerHTML = '<span class="icon-glyph" aria-hidden="true">' + icon + '</span>';
+    } else if(pauseBtn.classList && pauseBtn.classList.contains('icon-btn')){
+      pauseBtn.innerHTML = '<span class="icon-glyph" aria-hidden="true">' + icon + '</span><span class="icon-label">' + label + '</span>';
+    } else {
+      pauseBtn.textContent = label;
+    }
+    pauseBtn.setAttribute('aria-label', label);
+    pauseBtn.setAttribute('title', label);
+  }
+
+  function refreshPlayerUI(){ const n=state.playerName||'—'; playerNameEl.textContent=n; if(state.playerName){ state.best=getBestFor(state.playerName); bestEl.textContent=String(state.best); playBtn.disabled=false } else { bestEl.textContent='0'; playBtn.disabled=true } setPauseButtonVisual(); updateFirstPlayOverlay(); }
+  function updateFirstPlayOverlay(){
+    if(!firstPlayOverlay) return;
+    const shouldShow = !firstManualStartDone && !state.playing && !state.gameover;
+    firstPlayOverlay.hidden = !shouldShow;
+  }
+  function hideFirstPlayOverlay(){ if(firstPlayOverlay) firstPlayOverlay.hidden = true; }
+  setPauseButtonVisual();
+  function manualStartGame(){
+    if(!state.playerName){ openName(); updateFirstPlayOverlay(); return; }
+    firstManualStartDone = true;
+    hideFirstPlayOverlay();
+    reset();
+  }
+  function setNameStatus(txt, cls=''){
+    if(!nameStatus) return;
+    nameStatus.textContent = txt || '';
+    nameStatus.className = 'name-status' + (cls ? ' ' + cls : '');
+  }
+  function setNameSaveEnabled(enabled){
+    if(saveNameBtn) saveNameBtn.disabled = !enabled;
+  }
+  function normalizePseudo(n){
+    return String(n||'').trim().replace(/\s+/g,' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  }
+  function cleanPseudoInput(){
+    return String(nameInput.value||'').trim().replace(/\s+/g,' ').slice(0,20);
+  }
+  function getOnlineListFromPayload(data){
+    if(Array.isArray(data)) return data;
+    if(data && Array.isArray(data.leaderboard)) return data.leaderboard;
+    if(data && Array.isArray(data.scores)) return data.scores;
+    if(data && Array.isArray(data.results)) return data.results;
+    if(data && Array.isArray(data.data)) return data.data;
+    return [];
+  }
+  function itemPseudo(item){
+    if(!item) return '';
+    if(typeof item === 'string') return item;
+    return String(item.name || item.pseudo || item.player || item.playerName || item.username || '').trim();
+  }
+  async function fetchTakenPseudos(){
+    if(!SCORE_API_URL) return new Set();
+    const sep = SCORE_API_URL.includes('?') ? '&' : '?';
+    const res = await fetch(SCORE_API_URL + sep + 'check=pseudos&t=' + Date.now(), { method:'GET', cache:'no-store' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const taken = new Set();
+    getOnlineListFromPayload(data).forEach(item => {
+      const n = normalizePseudo(itemPseudo(item));
+      if(n) taken.add(n);
+    });
+    return taken;
+  }
+
+  let pseudoListCache = null;
+  let pseudoListLoading = null;
+  let pseudoCheckTimer = 0;
+  let pseudoCheckSeq = 0;
+  let pseudoOnlineConfirmed = false;
+
+  async function loadPseudoList(force=false){
+    if(!force && pseudoListCache) return pseudoListCache;
+    if(!force && pseudoListLoading) return pseudoListLoading;
+    pseudoListLoading = fetchTakenPseudos()
+      .then(set => { pseudoListCache = set; return set; })
+      .finally(() => { pseudoListLoading = null; });
+    return pseudoListLoading;
+  }
+  function isCurrentPseudo(raw){
+    const current = normalizePseudo(state.playerName || getPlayer());
+    return !!current && normalizePseudo(raw) === current;
+  }
+  function localPseudoState(){
+    const raw = cleanPseudoInput();
+    const wanted = normalizePseudo(raw);
+    if(!raw) return { status:'empty', raw, wanted, message:'Entre un pseudo entre 2 et 20 caractères.' };
+    if(raw.length < 2) return { status:'short', raw, wanted, message:'Choisis un pseudo d’au moins 2 caractères.' };
+    if(isCurrentPseudo(raw)) return { status:'current', raw, wanted, message:'Pseudo actuel conservé ✅' };
+    if(!pseudoListCache) return { status:'loading', raw, wanted, message:'Chargement des pseudos existants…' };
+    if(pseudoListCache.has(wanted)) return { status:'taken', raw, wanted, message:'Ce pseudo existe déjà. Choisis un autre pseudo.' };
+    return { status:'local-ok', raw, wanted, message:'Pseudo disponible localement. Vérification en ligne…' };
+  }
+  function refreshPseudoInputState(){
+    clearTimeout(pseudoCheckTimer);
+    pseudoOnlineConfirmed = false;
+    setNameSaveEnabled(false);
+    const st = localPseudoState();
+    if(st.status === 'empty' || st.status === 'short'){
+      setNameStatus(st.message, 'err');
+      return;
+    }
+    if(st.status === 'current'){
+      pseudoOnlineConfirmed = true;
+      setNameStatus(st.message, 'ok');
+      setNameSaveEnabled(true);
+      return;
+    }
+    if(st.status === 'loading'){
+      setNameStatus(st.message, 'wait');
+      return;
+    }
+    if(st.status === 'taken'){
+      setNameStatus(st.message, 'err');
+      return;
+    }
+    setNameStatus(st.message, 'wait');
+    pseudoCheckTimer = setTimeout(() => confirmPseudoOnline(false), 450);
+  }
+  async function confirmPseudoOnline(finalCheck=false){
+    const seq = ++pseudoCheckSeq;
+    const st = localPseudoState();
+    if(st.status === 'current'){
+      pseudoOnlineConfirmed = true;
+      setNameSaveEnabled(true);
+      return true;
+    }
+    if(st.status !== 'local-ok'){
+      refreshPseudoInputState();
+      return false;
+    }
+    setNameSaveEnabled(false);
+    setNameStatus(finalCheck ? 'Dernière vérification en ligne…' : 'Vérification en ligne…', 'wait');
+    try{
+      const taken = await loadPseudoList(true);
+      if(seq !== pseudoCheckSeq && !finalCheck) return false;
+      if(taken.has(st.wanted)){
+        pseudoOnlineConfirmed = false;
+        setNameStatus('Ce pseudo existe déjà. Choisis un autre pseudo.', 'err');
+        setNameSaveEnabled(false);
+        return false;
+      }
+      pseudoOnlineConfirmed = true;
+      setNameStatus('Pseudo disponible ✅', 'ok');
+      setNameSaveEnabled(true);
+      return true;
+    }catch(e){
+      console.warn('Pseudo live check error:', e);
+      pseudoOnlineConfirmed = false;
+      setNameStatus('Impossible de vérifier en ligne. Vérifie ta connexion.', 'err');
+      setNameSaveEnabled(false);
+      return false;
+    }
+  }
+  async function reservePseudoOnline(raw){
+    // Avec l'API actuelle de score, on réserve le pseudo par un score 0.
+    // Le classement filtre ensuite les scores à 0 pour ne pas polluer l'affichage public.
+    if(!SCORE_API_URL) return;
+    const body = new URLSearchParams({ name: String(raw||'Anonyme').slice(0,20), score: '0', register: '1' });
+    const res = await fetch(SCORE_API_URL, { method:'POST', body });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+  }
+  function openName(){
+    lockMobileViewport();
+    nameModal.classList.add('open');
+    nameInput.value=state.playerName||'';
+    pseudoOnlineConfirmed = false;
+    setNameSaveEnabled(false);
+    setNameStatus('Chargement des pseudos existants…', 'wait');
+    loadPseudoList(true)
+      .then(() => refreshPseudoInputState())
+      .catch(e => {
+        console.warn('Pseudo list load error:', e);
+        setNameStatus('Impossible de charger les pseudos. Vérifie ta connexion.', 'err');
+        setNameSaveEnabled(false);
+      });
+  }
+  function closeName(){ nameModal.classList.remove('open') }
+  setNameBtn.addEventListener('click',openName);
+  saveNameBtn.addEventListener('click',saveName);
+  nameInput.addEventListener('focus',()=>{ lockMobileViewport(); document.documentElement.classList.add('cr-name-focus'); setTimeout(()=>{ try{nameInput.scrollIntoView({block:'center',inline:'nearest'});}catch(e){} },80); });
+  nameInput.addEventListener('blur',()=>{ lockMobileViewport(); document.documentElement.classList.remove('cr-name-focus'); setTimeout(()=>{ try{ window.scrollTo({left:0,top:0,behavior:'instant'}); }catch(e){ try{window.scrollTo(0,0)}catch(_){} } },120); });
+  nameInput.addEventListener('touchstart', lockMobileViewport, {passive:true});
+  nameInput.addEventListener('input',refreshPseudoInputState);
+  nameInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!saveNameBtn.disabled) saveName(); } })
+  async function saveName(){
+    const raw=cleanPseudoInput();
+    if(!raw){ setNameStatus('Entre un pseudo entre 2 et 20 caractères.', 'err'); setNameSaveEnabled(false); return }
+    if(raw.length < 2){ setNameStatus('Choisis un pseudo d’au moins 2 caractères.', 'err'); setNameSaveEnabled(false); return }
+    if(isCurrentPseudo(raw)){
+      setPlayer(raw); state.playerName=raw; refreshPlayerUI(); closeName(); return;
+    }
+    const st = localPseudoState();
+    if(st.status === 'taken'){
+      setNameStatus('Ce pseudo existe déjà. Choisis un autre pseudo.', 'err');
+      setNameSaveEnabled(false);
+      return;
+    }
+    setNameSaveEnabled(false);
+    try{
+      const ok = await confirmPseudoOnline(true);
+      if(!ok) return;
+      setNameStatus('Réservation du pseudo…', 'wait');
+      await reservePseudoOnline(raw);
+      if(pseudoListCache) pseudoListCache.add(normalizePseudo(raw));
+      setPlayer(raw);
+      state.playerName=raw;
+      refreshPlayerUI();
+      setNameStatus('Pseudo validé ✅', 'ok');
+      closeName();
+    }catch(e){
+      console.warn('Pseudo save error:', e);
+      setNameStatus('Impossible de valider le pseudo en ligne. Réessaie.', 'err');
+      setNameSaveEnabled(false);
+    }
+  }
+
+  if(!state.playerName) openName(); refreshPlayerUI();
+
+  // ===== Niveaux
+  function targetObstaclesFor(level){ return 8 + Math.floor(level*2.2) }
+  function paramsFor(level){
+    const L=Math.max(1,Math.min(25,level));
+    const speedMul=1 + (L-1)*0.06;
+    const gapMin=Math.max(MIN_GAP_FLOOR, 600 - (L-1)*8);
+    const gapMax=Math.max(gapMin+110, 1020 - (L-1)*8);
+    const stackedChance=Math.min(0.7, 0.18 + (L-1)*0.02);
+    const doubleChance=Math.min(0.55, 0.10 + (L-1)*0.02);
+    const trainChance = (L%5===0) ? 0.35 : 0.08 + (L-1)*0.01;
+    return {speedMul,gapMin,gapMax,stackedChance,doubleChance,trainChance}
+  }
+  function levelUp(){ if(state.level>=25) return; state.level++; state.target=targetObstaclesFor(state.level); state.progress=0; showToast(`Niveau ${state.level}`); }
+  let toastTimer=null; let toastHoldUntil=0;
+  function showToast(txt, dur=2000){
+    const now = performance.now();
+    // Si un message long est en cours, ignorer les toasts plus courts
+    if (now < toastHoldUntil && (now + dur) < toastHoldUntil) {
+      return;
+    }
+    // Mettre à jour le message et étendre la durée minimale si nécessaire
+    toastMsg.textContent = txt;
+    toast.classList.add('show');
+    try{
+      if(fsNotice){
+        fsNotice.textContent = txt;
+        fsNotice.classList.add('show');
+        window.clearTimeout(window.__fsNoticeTimer);
+        window.__fsNoticeTimer = window.setTimeout(()=>fsNotice.classList.remove('show'), Math.min(Math.max(dur, 1800), 5200));
+      }
+    }catch(e){}
+    toastHoldUntil = Math.max(toastHoldUntil, now + dur);
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    const schedule = () => {
+      const left = toastHoldUntil - performance.now();
+      if (left > 10) {
+        toastTimer = setTimeout(schedule, Math.min(500, left));
+      } else {
+        toast.classList.remove('show');
+        toastTimer = null;
+        toastHoldUntil = 0;
+      }
+    };
+    schedule();
+  }
+
+  // ===== Obstacles
+  function spawnOne(x){
+    // Chaque palette reçoit un nombre de couches réellement aléatoire.
+    // 4 cartons par couche, de 1 à 10 couches en hauteur.
+    // La hauteur augmente avec chaque couche, tout en restant franchissable au saut.
+    const layers = 1 + ((Math.random()*10)|0);
+    const cols = 4;
+    const boxCount = layers * cols;
+    const w = 66 * scale;
+    const palletH = 5.5 * scale;
+    const boxH = 7.0 * scale;
+    const h = palletH + layers * boxH;
+    const tone = 0.92 + Math.random()*0.12;
+    return {
+      x,
+      y: ground() - h,
+      w,
+      h,
+      stacked: layers >= 2,
+      boxCount,
+      cols,
+      rows: layers,
+      layers,
+      boxesPerLayer: cols,
+      tone,
+      counted: false
+    };
+  }
+
+  let distSinceSpawn=0, nextGap=680;
+
+  // === zones protégées (pas de palettes) autour des malus actifs
+  function isInMalusSafeZone(x){
+    for(const m of maluses){
+      const left = (m.x - MALUS_SAFE_PAD_LEFT);
+      const right = (m.x + m.w + MALUS_SAFE_PAD_RIGHT);
+      if(x >= left && x <= right) return true;
+    }
+    return false;
+  }
+
+  function maybeSpawn(dt){
+    const {gapMin,gapMax,doubleChance,trainChance}=paramsFor(state.level);
+    const speed=currentSpeed();
+    distSinceSpawn += speed*dt;
+
+    if(distSinceSpawn >= nextGap){
+      distSinceSpawn = 0; nextGap = rand(gapMin,gapMax);
+      const spawnX = canvas.width + rand(0, 60);
+
+      // 1) Tentative de MALUS suspendu (remplace les palettes dans la zone)
+      const canSpawnMalus = (state.time - lastMalusAt >= MALUS_COOLDOWN);
+      if (canSpawnMalus && Math.random() < MALUS_SPAWN_CHANCE && !isInMalusSafeZone(spawnX+120)) {
+        const m = spawnMalus(spawnX + 120);
+        maluses.push(m);
+        lastMalusAt = state.time;
+        // Supprime tout obstacle qui chevauche la zone de sécurité du malus (garantie: passage libre dessous)
+        const left = (m.x - MALUS_SAFE_PAD_LEFT);
+        const right = (m.x + m.w + MALUS_SAFE_PAD_RIGHT);
+        state.obstacles = state.obstacles.filter(o => (o.x + o.w < left) || (o.x > right));
+        // IMPORTANT: ne pas ajouter d'obstacles pour ce tick => on sort.
+        return;
+      }
+
+      // 2) Sinon on génère des palettes (train/double/solo) UNIQUEMENT hors zones protégées
+      const r=Math.random();
+      if(r < trainChance){
+        const n=3 + ((state.level/5)|0);
+        const tight = Math.max(MIN_GAP_FLOOR, 260 - state.level*2);
+        for(let i=0;i<n;i++){
+          const x = spawnX + i*(tight);
+          if(!isInMalusSafeZone(x)) state.obstacles.push(spawnOne(x));
+        }
+      } else if(r < trainChance + doubleChance){
+        const tight = Math.max(MIN_GAP_FLOOR, 260 - state.level*2);
+        if(!isInMalusSafeZone(spawnX)) state.obstacles.push(spawnOne(spawnX));
+        if(!isInMalusSafeZone(spawnX + tight)) state.obstacles.push(spawnOne(spawnX + tight));
+      } else {
+        if(!isInMalusSafeZone(spawnX)) state.obstacles.push(spawnOne(spawnX));
+      }
+
+      // 3) Apparition RARE d’un bonus 🎁 (indépendant) tant qu’il n’entre pas en conflit de zone
+      const canSpawnBonus = (state.time - lastBonusAt >= BONUS_COOLDOWN) && (bonuses.length < BONUS_MAX_ACTIVE);
+      const bonusX = spawnX + 120;
+      if (canSpawnBonus && Math.random() < BONUS_SPAWN_CHANCE && !isInMalusSafeZone(bonusX)) {
+        bonuses.push(spawnBonus(bonusX));
+        lastBonusAt = state.time;
+      }
+
+      // GOLD
+      const canSpawnGold = (state.time - lastGoldAt >= GOLD_COOLDOWN) && (golds.length < GOLD_MAX_ACTIVE);
+      const goldX = spawnX + 140;
+      if (canSpawnGold && Math.random() < GOLD_SPAWN_CHANCE && !isInMalusSafeZone(goldX)) {
+        golds.push(spawnGold(goldX)); lastGoldAt = state.time;
+      }
+
+      // OIL
+      const canSpawnOil = (state.time - lastOilAt >= OIL_COOLDOWN) && (oils.length < OIL_MAX_ACTIVE);
+      const lastObs = state.obstacles[state.obstacles.length-1];
+      const oilX = lastObs ? (lastObs.x + lastObs.w + OIL_BARREL_OFFSET) : (spawnX + OIL_BARREL_OFFSET);
+      if (canSpawnOil && Math.random() < OIL_SPAWN_CHANCE && !isInMalusSafeZone(oilX)) {
+        oils.push(spawnOil(oilX)); lastOilAt = state.time;
+      }
+
+      // HELMET
+      const canSpawnHelmet = (state.time - lastHelmetAt >= HELMET_COOLDOWN) && (helmets.length < HELMET_MAX_ACTIVE);
+      const helmX = spawnX + 200;
+      if (canSpawnHelmet && Math.random() < HELMET_SPAWN_CHANCE && !isInMalusSafeZone(helmX)) {
+        helmets.push(spawnHelmet(helmX)); lastHelmetAt = state.time;
+      }
+    }
+  }
+
+  // ===== Utilitaires =====
+  const ground=()=> canvas.height*GROUND_Y;
+  const groundY = () => canvas.height*GROUND_Y;
+  const rand=(a,b)=> Math.random()*(b-a)+a;
+  const overlap=(a,b)=> a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+  const clamp=(v,a,b)=> Math.max(a,Math.min(b,v));
+  function currentSpeed(){
+    const base = BASE_SPEED * state.speedMul;
+    const lvlMul = paramsFor(state.level).speedMul;
+    const slowMul = (state.time < slowUntil) ? 0.6 : 1;
+    return base * lvlMul * slowMul;
+  }
+
+  // ===== BONUS helpers/draw
+  function spawnBonus(x){
+    const size = 28 * scale;
+    const y = ground() - (player.h*2.2 + size);
+    return { x, y, w: size, h: size, taken: false, t: 0 };
+  }
+  function drawBonus(b){
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 3*scale;
+    ctx.beginPath();
+    ctx.moveTo(b.x + b.w/2, b.y);
+    ctx.lineTo(b.x + b.w/2, b.y + b.h);
+    ctx.moveTo(b.x, b.y + b.h/2);
+    ctx.lineTo(b.x + b.w, b.y + b.h/2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "#ef4444";
+    ctx.beginPath();
+    ctx.ellipse(b.x + b.w/2, b.y + b.h/2, b.w*0.85, b.h*0.85, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== MALUS helpers/draw
+  function spawnMalus(x){
+    const size = 32 * scale;
+    const y = ground() - (player.h*2.2 + size);
+    return { x, y, w: size, h: size, taken: false, t: 0 };
+  }
+  function drawMalus(m){
+    // Halo rouge léger
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = "#ef4444";
+    ctx.beginPath();
+    ctx.ellipse(m.x + m.w/2, m.y + m.h/2, m.w*0.9, m.h*0.9, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Crâne
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(m.x + m.w/2, m.y + m.h*0.48, m.w*0.42, 0, Math.PI*2);
+    ctx.fill();
+
+    // Machoire
+    ctx.fillStyle = "#e5e7eb";
+    ctx.fillRect(m.x + m.w*0.30, m.y + m.h*0.60, m.w*0.40, m.h*0.22);
+
+    // Yeux
+    ctx.fillStyle = "#0b1220";
+    ctx.beginPath();
+    ctx.arc(m.x + m.w*0.38, m.y + m.h*0.48, m.w*0.10, 0, Math.PI*2);
+    ctx.arc(m.x + m.w*0.62, m.y + m.h*0.48, m.w*0.10, 0, Math.PI*2);
+    ctx.fill();
+
+    // Os croisés
+    ctx.strokeStyle = "#0b1220";
+    ctx.lineWidth = 2*scale;
+    ctx.beginPath();
+    ctx.moveTo(m.x + m.w*0.30, m.y + m.h*0.80);
+    ctx.lineTo(m.x + m.w*0.70, m.y + m.h*0.95);
+    ctx.moveTo(m.x + m.w*0.70, m.y + m.h*0.80);
+    ctx.lineTo(m.x + m.w*0.30, m.y + m.h*0.95);
+    ctx.stroke();
+  }
+
+function spawnGold(x){
+    const w = 36 * scale, h = 26 * scale;
+    const y = ground() - (player.h*2.2 + h);
+    return { x, y, w, h, taken:false, t:0 };
+  }
+  function drawGold(g){
+    ctx.fillStyle = "#fbbf24"; // corps
+    ctx.fillRect(g.x, g.y, g.w, g.h);
+    ctx.fillStyle = "#fde68a"; // lattes
+    ctx.fillRect(g.x + 4*scale, g.y + 4*scale, g.w - 8*scale, 5*scale);
+    ctx.fillRect(g.x + 4*scale, g.y + g.h - 9*scale, g.w - 8*scale, 5*scale);
+  }
+  function spawnOil(x){
+    const w = 44*scale, h = 16*scale;
+    const y = ground() - h + 2*scale;
+    return { x, y, w, h, taken:false, t:0 };
+  }
+  function drawOil(o){
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "#7c3aed";
+    ctx.beginPath(); ctx.ellipse(o.x + o.w/2, o.y + o.h/2, o.w/2, o.h/2.2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  function spawnHelmet(x){
+    const s = 28*scale;
+    const y = ground() - (player.h*2.2 + s);
+    return { x, y, w:s, h:s, taken:false, t:0 };
+  }
+  function drawHelmet(h){
+    ctx.fillStyle = "#fde68a";
+    ctx.beginPath();
+    ctx.arc(h.x + h.w/2, h.y + h.h*0.65, h.w*0.45, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(h.x + h.w*0.25, h.y + h.h*0.65, h.w*0.5, h.h*0.2);
+  }
+  // ===== Boucle de jeu
+  function reset(){
+  /* === Réinit stricte des effets & spawns (patch puriste 2025-09-26) === */
+  try {
+    if (typeof invUntil !== "undefined") { invUntil = 0; }
+    if (typeof slowUntil !== "undefined") { slowUntil = 0; }
+    if (typeof golds !== "undefined" && golds && typeof golds.length === "number") { golds.length = 0; }
+    if (typeof oils !== "undefined" && oils && typeof oils.length === "number") { oils.length = 0; }
+    if (typeof helmets !== "undefined" && helmets && typeof helmets.length === "number") { helmets.length = 0; }
+    if (typeof lastGoldAt !== "undefined")   { lastGoldAt = -999; }
+    if (typeof lastOilAt !== "undefined")    { lastOilAt  = -999; }
+    if (typeof lastHelmetAt !== "undefined") { lastHelmetAt = -999; }
+    if (typeof state !== "undefined" && state) {
+      state.time = 0;
+      if (typeof performance !== "undefined" && performance.now) {
+        state.tLast = performance.now();
+      }
+      if (typeof state.speedMul !== "undefined") { state.speedMul = 1; }
+    }
+    if (typeof player !== "undefined" && player) {
+      if (typeof ground === "function") {
+        player.y = ground() - player.h;
+      }
+      player.vy = 0;
+      player.onGround = true;
+      player.jumpCount = 0;
+    }
+  } catch(e) { console.warn("[reset patch puriste] ", e); }
+ if(!state.playerName){ openName(); updateFirstPlayOverlay(); return } hideFirstPlayOverlay(); state.playing=true; state.paused=false; state.gameover=false; state.level=1; state.progress=0; state.target=targetObstaclesFor(1); state.score=0; state.speedMul=1; state.obstacles.length=0; { const first = spawnOne(Math.max(canvas.width + 50, 800)); first.y = ground() - first.h; state.obstacles.push(first); } /* obstacle forcé au démarrage */ distSinceSpawn=0; nextGap=680; player.y=ground()-player.h; player.vy=0; player.onGround=true; state.time=0; state.tLast=performance.now(); bonuses.length=0; lastBonusAt=-999; maluses.length=0; lastMalusAt=-999; setPauseButtonVisual(); updateHUD() }
+  function updateHUD(){
+    const scoreTxt=String(Math.floor(state.score));
+    const bestTxt=String(state.best);
+    const speedTxt=currentSpeedMulText();
+    const levelTxt=String(state.level);
+    scoreEl.textContent = scoreTxt; bestEl.textContent = bestTxt; speedEl.textContent = speedTxt; levelEl.textContent = levelTxt; lvlBar.style.width = clamp((state.progress/state.target)*100, 0, 100) + '%';
+    if(fsScoreEl) fsScoreEl.textContent=scoreTxt;
+    if(fsBestEl) fsBestEl.textContent=bestTxt;
+    if(fsLevelEl) fsLevelEl.textContent=levelTxt;
+    if(fsSpeedEl) fsSpeedEl.textContent=speedTxt;
+    if(fsPauseBtn) fsPauseBtn.textContent = state.paused ? '🕹️' : '⏸️';
+  }
+  function currentSpeedMulText(){ const slowMul = (state.time < slowUntil) ? 0.6 : 1; const mul = paramsFor(state.level).speedMul * state.speedMul * slowMul; return mul.toFixed(2)+'x' }
+
+  playBtn.addEventListener('click',manualStartGame);
+  if(firstPlayBtn) firstPlayBtn.addEventListener('click',(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } manualStartGame(); });
+  pauseBtn.addEventListener('click',()=>{ if(!state.playing||state.gameover) return; state.paused=!state.paused; setPauseButtonVisual(); updateHUD(); });
+
+  function wantJump(){
+    if(!state.playing){
+      if(!firstManualStartDone){ updateFirstPlayOverlay(); showToast('Appuie sur ▶ Jouer pour lancer la première partie.'); return; }
+      reset(); return
+    }
+    if(state.paused||state.gameover) return
+    if(player.onGround || player.jumpCount < player.maxJumps){
+      player.vy = -JUMP_V;
+      player.onGround = false;
+      player.jumpCount++;
+      beep();
+    }
+  }
+  window.addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if(k===' '||k==='arrowup'||k==='w'){ e.preventDefault(); wantJump() } else if(k==='p'){ pauseBtn.click() } else if(k==='r'){ reset() } },{passive:false});
+  canvas.addEventListener('pointerdown',wantJump);
+
+  function tick(){
+    const now=performance.now(); let dt=(now-state.tLast)/1000; state.tLast=now; if(!state.playing||state.paused){ requestAnimationFrame(tick); return }
+    dt = Math.min(dt, 1/30);
+    state.time += dt; state.speedMul = clamp(state.speedMul + dt*0.015, 1, 1.5);
+
+    // Physique joueur
+    player.vy += GRAVITY*dt; player.y += player.vy*dt; const gy=ground(); if(player.y>=gy-player.h){ player.y=gy-player.h; player.vy=0; player.onGround=true; player.jumpCount=0 }
+
+    // Monde
+    const speed = currentSpeed();
+    state.obstacles.forEach(o=> o.x -= speed*dt);
+    maybeSpawn(dt);
+
+    // BONUS: défilement & collisions
+    for(const b of bonuses){ b.x -= speed*dt; b.t += dt; }
+    for(const b of bonuses){ if(!b.taken && overlap(hitbox(), b)){ b.taken = true; } }
+    for(const b of bonuses){ if(b.taken && !b._applied){ b._applied = true; state.score += 100; giftSound(); showToast('🎁 +100 (rare)'); } }
+    for(let i=bonuses.length-1;i>=0;i--){ const b=bonuses[i]; if(b.taken || b.x < -b.w-10){ bonuses.splice(i,1); } }
+
+    // MALUS: défilement & collisions
+    for(const m of maluses){ m.x -= speed*dt; m.t += dt; }
+    for(const m of maluses){ if(!m.taken && overlap(hitbox(), m)){ m.taken = true; } }
+    for(const m of maluses){ if(m.taken && !m._applied){ m._applied = true; state.score = Math.max(0, state.score - 50); malusSound(); showToast('💀 -50 (malus)'); } }
+    
+    // GOLD: défilement & collisions
+    for(const g of golds){ g.x -= speed*dt; g.t += dt; }
+    for(const g of golds){ if(!g.taken && overlap(hitbox(), g)){ g.taken = true; } }
+    for(const g of golds){ if(g.taken && !g._applied){ g._applied = true; state.score += 200; giftSound(); showToast('🥇 +200 (palette d’or)'); } }
+    for(let i=golds.length-1;i>=0;i--){ const g=golds[i]; if(g.taken || g.x < -g.w-10){ golds.splice(i,1); } }
+
+    // OIL: défilement & collisions
+    for(const o of oils){ o.x -= speed*dt; o.t += dt; }
+    for(const o of oils){ if(!o.taken && overlap(hitbox(), o)){ o.taken = true; } }
+    for(const o of oils){ if(o.taken && !o._applied){ o._applied = true; slowUntil = Math.max(slowUntil, state.time + 3); malusSound();
+      showToast('🛢️ vitesse −40% (3s)'); } }
+    for(let i=oils.length-1;i>=0;i--){ const o=oils[i]; if(o.taken || o.x < -o.w-10){ oils.splice(i,1); } }
+
+    // HELMET: défilement & collisions
+    for(const h of helmets){ h.x -= speed*dt; h.t += dt; }
+    for(const h of helmets){ if(!h.taken && overlap(hitbox(), h)){ h.taken = true; } }
+    for(const h of helmets){ if(h.taken && !h._applied){ h._applied = true; invUntil = Math.max(invUntil, state.time + 5); giftSound();
+      showToast('🪖 Immunité (5s)'); } }
+    for(let i=helmets.length-1;i>=0;i--){ const h=helmets[i]; if(h.taken || h.x < -h.w-10){ helmets.splice(i,1); } }
+for(let i=maluses.length-1;i>=0;i--){ const m=maluses[i]; if(m.taken || m.x < -m.w-10){ maluses.splice(i,1); } }
+
+    // Scoring + progression
+    state.score += speed*dt*0.05;
+    for(const o of state.obstacles){ if(!o.counted && (o.x+o.w) < player.x){ o.counted=true; state.progress++; if(state.progress>=state.target){ levelUp() } } }
+
+    // Collision (palettes)
+    const hb=hitbox();
+    if(!(state.time < invUntil)){
+      for(const o of state.obstacles){ if(overlap(hb,o)){ gameOver(); break } }
+    }
+
+    // Nettoyage obstacles
+    state.obstacles = state.obstacles.filter(o=> o.x > -o.w-10);
+
+    // Rendu
+    draw(); updateHUD(); requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  function gameOver(){ const finalScore = Math.floor(state.score); const name = state.playerName || getPlayer(); const bestBefore = getBestFor(name||''); const beatPersonal = finalScore > bestBefore; state.gameover=true; state.playing=false; crash(); if(state.playerName && beatPersonal){ state.best=finalScore; setBestFor(state.playerName,state.best) } updateHUD(); postOnlineScore(state.playerName || 'Anonyme', finalScore); (function(){ const msg = beatPersonal ? randomItem(WIN_MESSAGES) : randomItem(LOSE_MESSAGES); showToast((beatPersonal ? '🏆 ' : '💥 ') + personalizeMessage(msg, (state.playerName || getPlayer() || 'Joueur')), 8000); })() }
+
+  // ===== Rendu
+  function draw(){ const w=canvas.width, h=canvas.height; ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#0b1426'; ctx.fillRect(0, ground(), w, h-ground());
+    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.beginPath(); ctx.moveTo(0,ground()+1); ctx.lineTo(w,ground()+1); ctx.stroke();
+    for(const o of state.obstacles){ drawObstacle(o) }
+    for(const b of bonuses){ if(!b.taken) drawBonus(b); }
+    for(const m of maluses){ if(!m.taken) drawMalus(m); }
+    for(const g of golds){ if(!g.taken) drawGold(g); }
+    for(const o of oils){ if(!o.taken) drawOil(o); }
+    for(const h of helmets){ if(!h.taken) drawHelmet(h); }
+    
+    // === COMPTE À REBOURS D'IMMUNITÉ (affiché derrière le chariot) ===
+    (function(){
+      const remainFloat = (invUntil - state.time);
+      if (remainFloat > 0.001) {
+        const remain = Math.ceil(remainFloat);
+        const cx = player.x + player.w * 0.5;
+        const gy = groundY();
+        // placé au-dessus du chariot; s'il saute, on suit; sinon on colle juste au-dessus du toit
+        const cy = Math.min(player.y - 10*scale, gy - player.h - 12*scale);
+        ctx.save();
+        // gros chiffre rouge bien visible
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = "#ef4444";
+        ctx.textAlign = "center";
+        const fs = Math.max(36, Math.floor(90 * scale));
+        ctx.font = `bold ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+        // halo + contour pour lisibilité
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 10 * scale;
+        ctx.fillText(String(remain), cx, cy);
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = Math.max(1, Math.floor(3*scale));
+        ctx.strokeStyle = '#111827';
+        ctx.strokeText(String(remain), cx, cy);
+        ctx.restore();
+      }
+    })();
+    // === COMPTE À REBOURS RALENTI (flaque d'huile) — derrière le chariot ===
+    (function(){
+      const remainFloat = (slowUntil - state.time);
+      if (remainFloat > 0.001) {
+        const remain = Math.ceil(remainFloat);
+        const cx = player.x + player.w * 0.5;
+        const gy = groundY();
+        // Décalé un peu plus haut que l'immunité pour éviter le chevauchement visuel
+        const baseY = Math.min(player.y - 10*scale, gy - player.h - 12*scale);
+        const cy = baseY - 18*scale;
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = "#f59e0b"; // orange
+        ctx.textAlign = "center";
+        const fs = Math.max(30, Math.floor(80 * scale));
+        ctx.font = `bold ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 10 * scale;
+        ctx.fillText(String(remain), cx, cy);
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = Math.max(1, Math.floor(3*scale));
+        ctx.strokeStyle = '#111827';
+        ctx.strokeText(String(remain), cx, cy);
+        ctx.restore();
+      }
+    })();
+
+
+    // === Badges HUD (secours) pour durées résiduelles ===
+    (function(){
+      // Affiche de petits badges en haut-gauche si compteurs actifs
+      const pad = 10*scale;
+      ctx.save();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.font = `bold ${Math.max(10, Math.floor(14*scale))}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+
+      let y = pad;
+      const immLeft = Math.ceil(invUntil - state.time);
+      if (immLeft > 0) {
+        ctx.fillStyle = "rgba(239,68,68,0.85)"; // rouge
+        ctx.fillRect(pad, y, 38*scale, 18*scale);
+        ctx.fillStyle = "#fff";
+        ctx.fillText(String(immLeft)+'s', pad+6*scale, y+3*scale);
+        y += 20*scale;
+      }
+      const slowLeft = Math.ceil(slowUntil - state.time);
+      if (slowLeft > 0) {
+        ctx.fillStyle = "rgba(245,158,11,0.85)"; // orange
+        ctx.fillRect(pad, y, 38*scale, 18*scale);
+        ctx.fillStyle = "#fff";
+        ctx.fillText(String(slowLeft)+'s', pad+6*scale, y+3*scale);
+      }
+      ctx.restore();
+    })();
+drawForklift(player);
+    if(state.gameover){ ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(0,0,w,h); ctx.fillStyle='#fff'; ctx.font= `${18*scale}px system-ui,Segoe UI,Roboto`; ctx.textAlign='center'; ctx.fillText('Game Over — appuie sur Jouer / Rejouer ou sur R', w/2, h*0.45) }
+  }
+
+  const obstacleSpriteCache = new Map();
+
+  function buildObstacleSprite(o){
+    const s = scale;
+    const layers = Math.max(1, Math.min(10, o.layers || o.rows || 1));
+    const cols = 4;
+    const count = layers * cols;
+    const rows = layers;
+    const pad = Math.ceil(5*s);
+    const spriteW = Math.max(1, Math.ceil(o.w + pad*2));
+    const spriteH = Math.max(1, Math.ceil(o.h + pad*2));
+    const sprite = document.createElement('canvas');
+    sprite.width = spriteW;
+    sprite.height = spriteH;
+    const g = sprite.getContext('2d', {alpha:true});
+    if(!g) return null;
+
+    const ox = pad;
+    const oy = pad;
+    const palletH = Math.max(5*s, Math.min(7*s, o.h * 0.18));
+    const boxesH = o.h - palletH;
+    const boxH = boxesH / rows;
+    const gap = 1.0*s;
+    const innerW = o.w - 4.5*s;
+    const boxW = (innerW - gap*(cols-1)) / cols;
+    const palletY = oy + o.h - palletH;
+
+    function rr(x,y,w,h,r){
+      g.beginPath();
+      g.moveTo(x+r,y);
+      g.arcTo(x+w,y,x+w,y+h,r);
+      g.arcTo(x+w,y+h,x,y+h,r);
+      g.arcTo(x,y+h,x,y,r);
+      g.arcTo(x,y,x+w,y,r);
+      g.closePath();
+    }
+
+    // Palette bois réaliste : calculée une seule fois par obstacle.
+    const woodTop = g.createLinearGradient(ox, palletY, ox, palletY + palletH);
+    woodTop.addColorStop(0, '#d79a45');
+    woodTop.addColorStop(0.48, '#b8742e');
+    woodTop.addColorStop(1, '#7a451d');
+    g.fillStyle = woodTop;
+    rr(ox, palletY, o.w, palletH*0.42, 1.2*s); g.fill();
+
+    g.strokeStyle = 'rgba(86,45,18,.55)';
+    g.lineWidth = 0.75*s;
+    for(let i=1;i<5;i++){
+      const xx = ox + (o.w/5)*i;
+      g.beginPath(); g.moveTo(xx, palletY + 0.4*s); g.lineTo(xx, palletY + palletH*0.40); g.stroke();
+    }
+
+    const blockY = palletY + palletH*0.38;
+    const blockH = palletH*0.42;
+    const blockW = o.w*0.15;
+    g.fillStyle = '#92531f';
+    for(const p of [0.04, 0.43, 0.81]){
+      rr(ox + o.w*p, blockY, blockW, blockH, 0.8*s); g.fill();
+    }
+    g.fillStyle = '#6f3d18';
+    rr(ox + 1*s, palletY + palletH*0.78, o.w - 2*s, palletH*0.22, 0.6*s); g.fill();
+
+    // 4 cartons par couche, jusqu'à 10 couches. Le visuel complet est mis en cache.
+    let remaining = count;
+    for(let row=0; row<rows; row++){
+      const boxesThisRow = Math.min(cols, remaining);
+      remaining -= boxesThisRow;
+      const rowY = palletY - (row+1)*boxH;
+      const rowWidth = boxesThisRow*boxW + (boxesThisRow-1)*gap;
+      const startX = ox + (o.w - rowWidth)/2;
+
+      for(let c=0; c<boxesThisRow; c++){
+        const bx = startX + c*(boxW + gap);
+        const by = rowY;
+        const bw = boxW;
+        const bh = boxH;
+        const shade = Math.max(0.84, Math.min(1.08, (o.tone || 1) + ((c+row)%3 - 1)*0.025));
+        const baseR = Math.round(191*shade), baseG = Math.round(126*shade), baseB = Math.round(71*shade);
+
+        const front = g.createLinearGradient(bx, by, bx+bw, by+bh);
+        front.addColorStop(0, `rgb(${Math.min(255,baseR+18)},${Math.min(255,baseG+16)},${Math.min(255,baseB+12)})`);
+        front.addColorStop(0.56, `rgb(${baseR},${baseG},${baseB})`);
+        front.addColorStop(1, `rgb(${Math.max(0,baseR-22)},${Math.max(0,baseG-18)},${Math.max(0,baseB-15)})`);
+        g.fillStyle = front;
+        rr(bx, by, bw, bh, 1.0*s); g.fill();
+
+        g.fillStyle = 'rgba(232,177,115,.60)';
+        g.beginPath();
+        g.moveTo(bx + 1*s, by + 0.7*s);
+        g.lineTo(bx + bw*0.18, by - 1.8*s);
+        g.lineTo(bx + bw - 1*s, by - 0.7*s);
+        g.lineTo(bx + bw - 1*s, by + 1.5*s);
+        g.closePath(); g.fill();
+
+        g.fillStyle = 'rgba(92,46,20,.18)';
+        g.fillRect(bx + bw*0.84, by + 1.2*s, bw*0.16, bh - 1.8*s);
+
+        g.fillStyle = 'rgba(229,181,127,.62)';
+        g.fillRect(bx + bw*0.45, by, Math.max(1.6*s,bw*0.10), bh);
+        g.fillStyle = 'rgba(244,206,159,.70)';
+        g.fillRect(bx + bw*0.39, by - 0.7*s, bw*0.22, 1.8*s);
+
+        if(((row*cols+c) % 2) === 0 && bw > 13*s){
+          g.fillStyle = 'rgba(247,247,244,.90)';
+          rr(bx + bw*0.08, by + bh*0.20, bw*0.28, bh*0.24, 0.45*s); g.fill();
+          g.fillStyle = 'rgba(35,35,35,.58)';
+          for(let k=0;k<4;k++) g.fillRect(bx + bw*0.11 + k*1.1*s, by + bh*0.25, 0.5*s, bh*0.13);
+        }
+
+        g.fillStyle = 'rgba(31,25,20,.80)';
+        g.font = `${Math.max(5, Math.floor(6.5*s))}px system-ui, -apple-system, Segoe UI, sans-serif`;
+        g.textAlign = 'right';
+        g.textBaseline = 'bottom';
+        g.fillText('↑↑  ◇  ☂', bx + bw - 1.4*s, by + bh - 1.0*s);
+
+        g.strokeStyle = 'rgba(76,42,22,.52)';
+        g.lineWidth = 0.7*s;
+        rr(bx, by, bw, bh, 1.0*s); g.stroke();
+        g.strokeStyle = 'rgba(255,230,195,.20)';
+        g.beginPath(); g.moveTo(bx + 1*s, by + 1.2*s); g.lineTo(bx + bw - 1*s, by + 1.2*s); g.stroke();
+      }
+    }
+
+    return {canvas:sprite, pad};
+  }
+
+  function drawObstacle(o){
+    const s = scale;
+    const key = `${Math.max(1, Math.min(10, o.layers || o.rows || 1))}|${o.w}|${o.h}|${s}`;
+
+    // Ombre dynamique très légère : coût négligeable.
+    ctx.save();
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(o.x + o.w*0.52, o.y + o.h + 2.2*s, o.w*0.58, 3.4*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // Le visuel complexe des cartons est calculé une seule fois, puis réutilisé à chaque frame.
+    // Cela évite de recréer jusqu'à 40 gradients, textes, étiquettes et contours par palette à 60 FPS.
+    let cached = obstacleSpriteCache.get(key);
+    if(!cached){
+      cached = buildObstacleSprite(o);
+      if(cached) obstacleSpriteCache.set(key, cached);
+    }
+    if(cached && cached.canvas){
+      ctx.drawImage(cached.canvas, o.x - cached.pad, o.y - cached.pad);
+      return;
+    }
+
+    // Secours minimal si la création du cache canvas échoue.
+    ctx.fillStyle = '#b8742e';
+    roundedRect(o.x, o.y, o.w, o.h, 2*s); ctx.fill();
+  }
+
+  function roundedRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function drawTire(cx, cy, r, rot){
+    ctx.fillStyle = "#0f172a";
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#111827"; ctx.lineWidth = 2*scale;
+    ctx.beginPath(); ctx.arc(cx, cy, r*0.92, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.beginPath(); ctx.arc(cx, cy, r*0.55, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#cbd5e1";
+    for(let i=0;i<5;i++){
+      const a = rot + i * (Math.PI*2/5);
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a)*r*0.28, cy + Math.sin(a)*r*0.28, 1.8*scale, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot);
+    ctx.strokeStyle = "#1f2937"; ctx.lineWidth = 2*scale;
+    for(let i=0;i<6;i++){
+      const a = i*(Math.PI/3);
+      ctx.beginPath(); ctx.moveTo(Math.cos(a)*(r*0.85), Math.sin(a)*(r*0.85));
+      ctx.lineTo(Math.cos(a)*(r*0.60), Math.sin(a)*(r*0.60)); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawForklift(p){
+    const {x,y,w,h} = p;
+    const r = scale;
+    const gy = groundY();
+
+    // Ombre au sol plus naturelle
+    const dist = Math.max(0, gy - (y + h));
+    const shadowScale = Math.max(0.34, 1 - dist / (h * 1.25));
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.beginPath();
+    ctx.ellipse(x + w*0.50, gy + 4*r, (w*0.64) * shadowScale, (8.5*r) * shadowScale, 0, 0, Math.PI*2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if(realisticForkliftImg.complete && realisticForkliftImg.naturalWidth){
+      const aspect = realisticForkliftImg.naturalWidth / realisticForkliftImg.naturalHeight;
+      let drawH = h * 1.18;
+      let drawW = drawH * aspect;
+      const maxW = w * 1.60;
+      if(drawW > maxW){ drawW = maxW; drawH = drawW / aspect; }
+      const imgX = x - w*0.06;
+      const imgY = (y + h) - drawH - 2*r;
+      ctx.drawImage(realisticForkliftImg, imgX, imgY, drawW, drawH);
+
+      p.beacon += 0.15 * state.speedMul;
+      const flash = (Math.sin(p.beacon) * 0.5 + 0.5);
+      const isImmune = (state.time < invUntil);
+      const base = isImmune ? [239,68,68] : [251,191,36];
+      const beaconX = imgX + drawW*0.58;
+      const beaconY = imgY + drawH*0.18;
+      ctx.fillStyle = 'rgba(30,41,59,.78)';
+      roundedRect(beaconX - 2*r, beaconY + 1.8*r, 4*r, 2*r, 0.9*r); ctx.fill();
+      ctx.fillStyle = `rgba(${base[0]}, ${base[1]}, ${base[2]}, ${0.28 + 0.42*flash})`;
+      ctx.beginPath(); ctx.arc(beaconX, beaconY, 4.2*r, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = `rgba(${base[0]}, ${base[1]}, ${base[2]}, 0.68)`; ctx.lineWidth = 1*r;
+      ctx.beginPath(); ctx.arc(beaconX, beaconY, 4.8*r + 1.5*r*flash, 0, Math.PI*2); ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+
+    const orangeTop = '#f2a23a';
+    const orangeMid = '#c8741f';
+    const orangeDeep = '#7b4316';
+    const steelLight = '#66788b';
+    const glassTop = 'rgba(150,185,220,.22)';
+    const glassBottom = 'rgba(100,135,170,.10)';
+
+    // Châssis inférieur
+    const chassisX = x + w*0.09;
+    const chassisY = y + h*0.54;
+    const chassisW = w*0.58;
+    const chassisH = h*0.24;
+    const chassisGrad = ctx.createLinearGradient(chassisX, chassisY, chassisX, chassisY + chassisH);
+    chassisGrad.addColorStop(0, '#273241');
+    chassisGrad.addColorStop(.52, '#161d28');
+    chassisGrad.addColorStop(1, '#0f141d');
+    ctx.fillStyle = chassisGrad;
+    roundedRect(chassisX, chassisY, chassisW, chassisH, 7*r); ctx.fill();
+
+    // Contrepoids arrière
+    const rearX = x + w*0.02;
+    const rearY = y + h*0.43;
+    const rearW = w*0.31;
+    const rearH = h*0.34;
+    const rearGrad = ctx.createLinearGradient(rearX, rearY, rearX + rearW, rearY + rearH);
+    rearGrad.addColorStop(0, '#313d4d');
+    rearGrad.addColorStop(1, '#151d27');
+    ctx.fillStyle = rearGrad;
+    roundedRect(rearX, rearY, rearW, rearH, 9*r); ctx.fill();
+
+    // Carrosserie orange plus réaliste
+    const bodyX = x + w*0.12;
+    const bodyY = y + h*0.34;
+    const bodyW = w*0.56;
+    const bodyH = h*0.33;
+    const bodyGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH);
+    bodyGrad.addColorStop(0, orangeTop);
+    bodyGrad.addColorStop(.50, orangeMid);
+    bodyGrad.addColorStop(1, orangeDeep);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(bodyX + 5*r, bodyY + bodyH);
+    ctx.lineTo(bodyX, bodyY + bodyH*0.56);
+    ctx.quadraticCurveTo(bodyX + bodyW*0.06, bodyY + bodyH*0.10, bodyX + bodyW*0.32, bodyY + bodyH*0.03);
+    ctx.lineTo(bodyX + bodyW*0.78, bodyY + bodyH*0.02);
+    ctx.quadraticCurveTo(bodyX + bodyW*0.98, bodyY + bodyH*0.05, bodyX + bodyW, bodyY + bodyH*0.28);
+    ctx.lineTo(bodyX + bodyW, bodyY + bodyH*0.78);
+    ctx.quadraticCurveTo(bodyX + bodyW*0.94, bodyY + bodyH, bodyX + bodyW*0.72, bodyY + bodyH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Rehaut / reflets
+    ctx.strokeStyle = 'rgba(35,18,8,.48)';
+    ctx.lineWidth = 1.2*r;
+    ctx.beginPath();
+    ctx.moveTo(bodyX + bodyW*0.18, bodyY + bodyH*0.20);
+    ctx.lineTo(bodyX + bodyW*0.62, bodyY + bodyH*0.18);
+    ctx.lineTo(bodyX + bodyW*0.72, bodyY + bodyH*0.72);
+    ctx.lineTo(bodyX + bodyW*0.22, bodyY + bodyH*0.75);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.12)';
+    ctx.beginPath();
+    ctx.moveTo(bodyX + bodyW*0.16, bodyY + bodyH*0.16);
+    ctx.lineTo(bodyX + bodyW*0.61, bodyY + bodyH*0.13);
+    ctx.lineTo(bodyX + bodyW*0.56, bodyY + bodyH*0.23);
+    ctx.lineTo(bodyX + bodyW*0.18, bodyY + bodyH*0.26);
+    ctx.closePath();
+    ctx.fill();
+
+    // Ouïes moteur arrière
+    ctx.strokeStyle = 'rgba(10,10,10,.45)';
+    ctx.lineWidth = 1.1*r;
+    for(let i=0;i<4;i++){
+      const yy = rearY + rearH*0.28 + i*4.8*r;
+      ctx.beginPath();
+      ctx.moveTo(rearX + rearW*0.18, yy);
+      ctx.lineTo(rearX + rearW*0.58, yy);
+      ctx.stroke();
+    }
+
+    // Cabine + toit de protection
+    const cabX = x + w*0.23;
+    const cabY = y + h*0.06;
+    const cabW = w*0.28;
+    const cabH = h*0.43;
+    ctx.strokeStyle = steelLight;
+    ctx.lineWidth = 2.1*r;
+    ctx.beginPath();
+    ctx.moveTo(cabX, cabY + cabH);
+    ctx.lineTo(cabX + cabW*0.04, cabY + cabH*0.06);
+    ctx.moveTo(cabX + cabW*0.88, cabY + cabH);
+    ctx.lineTo(cabX + cabW*0.92, cabY + cabH*0.06);
+    ctx.moveTo(cabX + cabW*0.24, cabY + cabH);
+    ctx.lineTo(cabX + cabW*0.26, cabY + cabH*0.10);
+    ctx.moveTo(cabX + cabW*0.60, cabY + cabH);
+    ctx.lineTo(cabX + cabW*0.62, cabY + cabH*0.10);
+    ctx.stroke();
+    const roofGrad = ctx.createLinearGradient(cabX, cabY, cabX+cabW, cabY+10*r);
+    roofGrad.addColorStop(0,'#5f7286');
+    roofGrad.addColorStop(1,'#1a2430');
+    ctx.fillStyle = roofGrad;
+    roundedRect(cabX - 2*r, cabY - 2*r, cabW + 5*r, 8*r, 3*r); ctx.fill();
+
+    // Vitrage fumé
+    const glass = ctx.createLinearGradient(cabX, cabY + 5*r, cabX, cabY + cabH);
+    glass.addColorStop(0, glassTop);
+    glass.addColorStop(1, glassBottom);
+    ctx.fillStyle = glass;
+    ctx.beginPath();
+    ctx.moveTo(cabX + 1*r, cabY + 6*r);
+    ctx.lineTo(cabX + cabW*0.80, cabY + 4*r);
+    ctx.lineTo(cabX + cabW*0.82, cabY + cabH*0.88);
+    ctx.lineTo(cabX + cabW*0.10, cabY + cabH*0.90);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(172,196,216,.42)';
+    ctx.lineWidth = 1.2*r;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.16)';
+    ctx.beginPath();
+    ctx.moveTo(cabX + cabW*0.18, cabY + cabH*0.18);
+    ctx.lineTo(cabX + cabW*0.40, cabY + cabH*0.16);
+    ctx.lineTo(cabX + cabW*0.34, cabY + cabH*0.68);
+    ctx.stroke();
+
+    // Siège + conducteur + volant
+    ctx.fillStyle = '#101720';
+    roundedRect(x + w*0.30, y + h*0.39, w*0.10, h*0.10, 2*r); ctx.fill();
+    ctx.fillRect(x + w*0.30, y + h*0.31, w*0.08, h*0.08);
+    ctx.fillStyle = '#0d131b';
+    ctx.beginPath(); ctx.arc(x + w*0.36, y + h*0.24, 4.5*r, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(x + w*0.34, y + h*0.28, 4*r, h*0.10);
+    ctx.strokeStyle = '#0f1720'; ctx.lineWidth = 1.8*r;
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.38, y + h*0.34);
+    ctx.lineTo(x + w*0.45, y + h*0.29);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + w*0.46, y + h*0.27, 4.2*r, 0, Math.PI*2); ctx.stroke();
+
+    // Mât détaillé
+    const mastX = x + w*0.69;
+    const mastY = y;
+    const mastW = w*0.11;
+    const mastH = h*0.92;
+    const mastGrad = ctx.createLinearGradient(mastX, mastY, mastX + mastW, mastY + mastH);
+    mastGrad.addColorStop(0, '#48586a');
+    mastGrad.addColorStop(.5, '#24303e');
+    mastGrad.addColorStop(1, '#111923');
+    ctx.fillStyle = mastGrad;
+    roundedRect(mastX, mastY, mastW*0.36, mastH, 2*r); ctx.fill();
+    roundedRect(mastX + mastW*0.64, mastY, mastW*0.36, mastH, 2*r); ctx.fill();
+    ctx.fillStyle = '#0c1219';
+    roundedRect(mastX + mastW*0.20, mastY + 5*r, mastW*0.10, mastH - 10*r, 1.4*r); ctx.fill();
+    roundedRect(mastX + mastW*0.70, mastY + 5*r, mastW*0.10, mastH - 10*r, 1.4*r); ctx.fill();
+    ctx.strokeStyle = 'rgba(148,163,184,.25)';
+    ctx.lineWidth = 1*r;
+    for(let i=0;i<5;i++){
+      const yy = mastY + h*0.12 + i*h*0.16;
+      ctx.beginPath();
+      ctx.moveTo(mastX + mastW*0.12, yy);
+      ctx.lineTo(mastX + mastW*0.88, yy + 1.5*r);
+      ctx.stroke();
+    }
+    const cylX = mastX - w*0.028;
+    ctx.fillStyle = '#1a2330';
+    roundedRect(cylX, y + h*0.20, w*0.024, h*0.48, 2*r); ctx.fill();
+    const rodGrad = ctx.createLinearGradient(cylX, y + h*0.15, cylX + 4*r, y + h*0.60);
+    rodGrad.addColorStop(0, '#e2e8f0');
+    rodGrad.addColorStop(.5, '#8ea2b8');
+    rodGrad.addColorStop(1, '#f8fafc');
+    ctx.fillStyle = rodGrad;
+    roundedRect(cylX + 2*r, y + h*0.14, 3.2*r, h*0.38, 1.6*r); ctx.fill();
+
+    // Tablier / dosseret / fourches
+    const carriageY = y + h*0.51;
+    const carriageH = h*0.22;
+    const carriageW = w*0.18;
+    const carriageX = mastX - w*0.025;
+    const carriageGrad = ctx.createLinearGradient(carriageX, carriageY, carriageX, carriageY + carriageH);
+    carriageGrad.addColorStop(0, '#364556');
+    carriageGrad.addColorStop(1, '#161f2a');
+    ctx.fillStyle = carriageGrad;
+    roundedRect(carriageX, carriageY, carriageW, carriageH, 3*r); ctx.fill();
+    ctx.fillStyle = '#243244';
+    for(let i=0;i<4;i++) ctx.fillRect(carriageX + i*(carriageW*0.23), carriageY - h*0.11, 2.2*r, h*0.11);
+    const forkY = carriageY + carriageH*0.68;
+    const forkL = w*0.46;
+    const forkGrad = ctx.createLinearGradient(carriageX, forkY, carriageX + forkL, forkY + 6*r);
+    forkGrad.addColorStop(0,'#9aa6b2');
+    forkGrad.addColorStop(.45,'#697887');
+    forkGrad.addColorStop(1,'#46515d');
+    ctx.fillStyle = forkGrad;
+    roundedRect(carriageX + 2*r, forkY, forkL, 5.5*r, 1.5*r); ctx.fill();
+    ctx.fillStyle = '#6b7280';
+    ctx.beginPath();
+    ctx.moveTo(carriageX + 2*r, forkY);
+    ctx.lineTo(carriageX + 8*r, forkY - 4*r);
+    ctx.lineTo(carriageX + 10*r, forkY - 4*r);
+    ctx.lineTo(carriageX + 6*r, forkY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.lineWidth = .9*r;
+    ctx.beginPath();
+    ctx.moveTo(carriageX + 4*r, forkY + 1.4*r);
+    ctx.lineTo(carriageX + forkL - 4*r, forkY + 1.4*r);
+    ctx.stroke();
+
+    // Marchepied et garde-boue
+    ctx.fillStyle = '#0f1720';
+    roundedRect(x + w*0.16, y + h*0.67, w*0.11, h*0.05, 2*r); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + w*0.22, y + h*0.72, 9.5*r, Math.PI, Math.PI*2);
+    ctx.arc(x + w*0.56, y + h*0.72, 9.5*r, Math.PI, Math.PI*2);
+    ctx.strokeStyle = 'rgba(15,23,32,.8)';
+    ctx.lineWidth = 3*r;
+    ctx.stroke();
+
+    // Feux
+    ctx.fillStyle = 'rgba(255,247,200,.9)';
+    roundedRect(bodyX + bodyW*0.70, bodyY + bodyH*0.18, 4.4*r, 3.6*r, 1*r); ctx.fill();
+    ctx.fillStyle = 'rgba(255,90,90,.85)';
+    roundedRect(rearX + rearW*0.14, rearY + rearH*0.40, 3.6*r, 3.2*r, 1*r); ctx.fill();
+
+    // Gyrophare
+    p.beacon += 0.15 * state.speedMul;
+    const flash = (Math.sin(p.beacon) * 0.5 + 0.5);
+    const isImmune = (state.time < invUntil);
+    const base = isImmune ? [239,68,68] : [251,191,36];
+    const beaconX = cabX + cabW*0.10;
+    const beaconY = cabY - 4.2*r;
+    ctx.fillStyle = '#1e293b';
+    roundedRect(beaconX - 2*r, beaconY + 2*r, 4*r, 2.2*r, 1*r); ctx.fill();
+    ctx.fillStyle = `rgba(${base[0]}, ${base[1]}, ${base[2]}, ${0.32 + 0.42*flash})`;
+    ctx.beginPath(); ctx.arc(beaconX, beaconY, 4.6*r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = `rgba(${base[0]}, ${base[1]}, ${base[2]}, ${0.72})`; ctx.lineWidth = 1*r;
+    ctx.beginPath(); ctx.arc(beaconX, beaconY, 5.2*r + 1.4*r*flash, 0, Math.PI*2); ctx.stroke();
+
+    // Roues
+    p.wheelRot = (p.wheelRot || 0) + 0.18 * state.speedMul;
+    drawTire(x + w*0.22, y + h*0.80, 14*r, p.wheelRot);
+    drawTire(x + w*0.56, y + h*0.80, 14*r, p.wheelRot);
+
+    // Contours finaux
+    ctx.strokeStyle = 'rgba(0,0,0,.48)';
+    ctx.lineWidth = 1.25*r;
+    roundedRect(chassisX, chassisY, chassisW, chassisH, 7*r); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bodyX + 5*r, bodyY + bodyH);
+    ctx.lineTo(bodyX, bodyY + bodyH*0.56);
+    ctx.quadraticCurveTo(bodyX + bodyW*0.06, bodyY + bodyH*0.10, bodyX + bodyW*0.32, bodyY + bodyH*0.03);
+    ctx.lineTo(bodyX + bodyW*0.78, bodyY + bodyH*0.02);
+    ctx.quadraticCurveTo(bodyX + bodyW*0.98, bodyY + bodyH*0.05, bodyX + bodyW, bodyY + bodyH*0.28);
+    ctx.lineTo(bodyX + bodyW, bodyY + bodyH*0.78);
+    ctx.quadraticCurveTo(bodyX + bodyW*0.94, bodyY + bodyH, bodyX + bodyW*0.72, bodyY + bodyH);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function stopFrameEvent(e){ if(e){ e.preventDefault(); e.stopPropagation(); } }
+  function showFullscreenHelp(){
+    if(!fsHelp) return;
+    fsHelp.classList.add('show');
+    window.clearTimeout(window.__fsHelpTimer);
+    window.__fsHelpTimer = window.setTimeout(()=>fsHelp.classList.remove('show'), 5200);
+  }
+  async function enterFullscreenGame(e){
+    stopFrameEvent(e);
+    if(!gameFrame) return;
+    gameFrame.classList.add('is-fullscreen');
+    document.documentElement.classList.add('cr-fs-active');
+    showFullscreenHelp();
+    try{ if(gameFrame.requestFullscreen && !document.fullscreenElement) await gameFrame.requestFullscreen(); }catch(err){ console.warn('Plein écran refusé :', err); }
+    try{ if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(err){ console.warn('Orientation paysage non verrouillée :', err); showFullscreenHelp(); }
+    setTimeout(fit,80);
+    setTimeout(fit,360);
+  }
+  async function exitFullscreenGame(e){
+    stopFrameEvent(e);
+    try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(err){}
+    try{ if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); }catch(err){}
+    if(gameFrame) gameFrame.classList.remove('is-fullscreen');
+    document.documentElement.classList.remove('cr-fs-active');
+    setTimeout(fit,80);
+  }
+  if(frameFullscreenBtn) frameFullscreenBtn.addEventListener('click', enterFullscreenGame);
+  if(frameExitBtn) frameExitBtn.addEventListener('click', exitFullscreenGame);
+  if(fsPauseBtn) fsPauseBtn.addEventListener('click',(e)=>{ stopFrameEvent(e); if(pauseBtn) pauseBtn.click(); updateHUD(); });
+  if(fsLeaderboardBtn) fsLeaderboardBtn.addEventListener('click',(e)=>{ stopFrameEvent(e); window.location.href='game/leaderboard.html'; });
+  const fsChatBtn = document.getElementById('fsChatBtn');
+  if(fsChatBtn) fsChatBtn.addEventListener('click',(e)=>{ openGroupChat(e); });
+  // Ne jamais preventDefault sur pointerdown/touchstart ici : sur Android, cela peut empêcher le click des boutons overlay.
+  // On stoppe seulement la propagation pour éviter tout geste parasite, et chaque bouton garde son vrai gestionnaire click.
+  ['pointerdown','touchstart'].forEach(evt=>{
+    document.querySelectorAll('.fs-btn,.fs-back,.frame-fs-btn,.fs-volume,.fs-volume input,#chatBtn,#fsChatBtn').forEach(el=>{
+      el.addEventListener(evt, (e)=>{ if(e) e.stopPropagation(); }, {passive:true});
+    });
+  });
+  document.addEventListener('fullscreenchange',()=>{
+    if(!document.fullscreenElement && gameFrame && gameFrame.classList.contains('is-fullscreen')){
+      gameFrame.classList.remove('is-fullscreen');
+      document.documentElement.classList.remove('cr-fs-active');
+      setTimeout(fit,80);
+    }
+  });
+
+  // Version finale propre : démarrage manuel conservé + chat direct Apps Script.
+  updateFirstPlayOverlay();
+  draw();
+
+
+  async function postOnlineScore(name, score){
+    try{
+      if(!SCORE_API_URL) return;
+      const body = new URLSearchParams({ name: String(name||'Anonyme').slice(0,20), score: String(Math.floor(score||0)) });
+      const res = await fetch(SCORE_API_URL, { method:'POST', body });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    }catch(e){ console.warn('postOnlineScore error:', e); }
+  }
+
+  function openGroupChat(e){
+    if(e){ e.preventDefault(); e.stopPropagation(); }
+    const pseudo = (state && state.playerName) || getPlayer() || '';
+    const url = new URL(CHAT_WEBAPP_URL);
+    url.searchParams.set('page','chat');
+    url.searchParams.set('pseudo', pseudo || 'Joueur');
+    // Version finale propre : ouverture directe du Web App Apps Script.
+    // L'iframe locale pouvait rester bloquée sur "Waiting for authorization"
+    // alors que l'URL Apps Script fonctionne correctement en accès direct.
+    window.location.href = url.href;
+  }
+
+  (function(){
+    const b = document.getElementById('onlineBtn');
+    if(b){ b.addEventListener('click', ()=>{ window.location.href = 'game/leaderboard.html'; }); }
+    const chat = document.getElementById('chatBtn');
+    if(chat){ chat.addEventListener('click', openGroupChat); }
+  })();
+
+})();
+</script>
+
+<script>
+(function(){
+  const audio = document.getElementById('userMusic');
+  const filePicker = document.getElementById('musicPicker');
+  const folderPicker = document.getElementById('musicFolderPicker');
+  const playBtn = document.getElementById('musicPlayBtn');
+  const stopBtn = document.getElementById('musicStopBtn');
+  const prevBtn = document.getElementById('musicPrevBtn');
+  const nextBtn = document.getElementById('musicNextBtn');
+  const statusEl = document.getElementById('musicStatus');
+  const volumeSlider = document.getElementById('musicVolume');
+  const fsPlayBtn = document.getElementById('fsPlayMusicBtn');
+  const fsStopBtn = document.getElementById('fsStopMusicBtn');
+  const fsPrevBtn = document.getElementById('fsPrevMusicBtn');
+  const fsNextBtn = document.getElementById('fsNextMusicBtn');
+  const fsVolumeSlider = document.getElementById('fsMusicVolume');
+
+  const DB_NAME = 'cariste_runner_music_v2';
+  const STORE_NAME = 'settings';
+  const DIR_KEY = 'musicDirectoryHandle';
+  const VOL_KEY = 'cariste_runner_music_volume';
+  const AUDIO_EXT_RE = /\.(mp3|m4a|aac|ogg|oga|wav|flac|opus|webm)$/i;
+  const canPickDirectory = !!(window.showDirectoryPicker && window.isSecureContext);
+
+  let tracks = [];
+  let currentIndex = 0;
+  let currentUrl = null;
+  let directoryHandle = null;
+  let busy = false;
+  let lastPlayRequest = 0;
+
+  initMusicVolume();
+  if (volumeSlider) {
+    volumeSlider.addEventListener('input', onVolumeInput);
+    volumeSlider.addEventListener('change', onVolumeInput);
+  }
+  if (fsVolumeSlider) {
+    fsVolumeSlider.addEventListener('input', onVolumeInput);
+    fsVolumeSlider.addEventListener('change', onVolumeInput);
+    fsVolumeSlider.addEventListener('pointerdown', (e)=>{ if(e) e.stopPropagation(); }, {passive:true});
+    fsVolumeSlider.addEventListener('touchstart', (e)=>{ if(e) e.stopPropagation(); }, {passive:true});
+    fsVolumeSlider.addEventListener('pointerup', onVolumeInput);
+    fsVolumeSlider.addEventListener('touchend', (e)=>{ onVolumeInput({target:fsVolumeSlider}); }, {passive:true});
+  }
+
+  function cleanName(name){
+    return String(name || 'musique').split('/').pop().replace(/\.[^/.]+$/, '').trim() || 'musique';
+  }
+
+  function setStatus(text){
+    if (statusEl) statusEl.textContent = text;
+  }
+
+  function clampVolume(v){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0.7;
+    return Math.max(0, Math.min(1, n));
+  }
+
+  function setMusicVolume(value, save=true){
+    const vol = clampVolume(value);
+    if (audio) audio.volume = vol;
+    const percent = String(Math.round(vol * 100));
+    if (volumeSlider && volumeSlider.value !== percent) volumeSlider.value = percent;
+    if (fsVolumeSlider && fsVolumeSlider.value !== percent) fsVolumeSlider.value = percent;
+    if (save) { try{ localStorage.setItem(VOL_KEY, String(vol)); }catch(e){} }
+  }
+
+  function initMusicVolume(){
+    let stored = null;
+    try{ stored = localStorage.getItem(VOL_KEY); }catch(e){}
+    setMusicVolume(stored !== null ? Number(stored) : 0.7, false);
+  }
+
+  function onVolumeInput(e){
+    const raw = e && e.target ? Number(e.target.value) : 70;
+    setMusicVolume(raw / 100, true);
+  }
+
+  function notify(message){
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    if (toast && toastMsg) {
+      toastMsg.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(window.__musicToastTimer);
+      window.__musicToastTimer = window.setTimeout(() => toast.classList.remove('show'), 3600);
+    } else {
+      alert(message);
+    }
+  }
+
+  function isAudioFile(fileOrName){
+    const name = typeof fileOrName === 'string' ? fileOrName : (fileOrName && fileOrName.name) || '';
+    const type = typeof fileOrName === 'string' ? '' : (fileOrName && fileOrName.type) || '';
+    return /^audio\//.test(type) || AUDIO_EXT_RE.test(name);
+  }
+
+  function shuffle(list){
+    const copy = list.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  function openDb(){
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) return reject(new Error('IndexedDB indisponible'));
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+          req.result.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('Erreur IndexedDB'));
+    });
+  }
+
+  async function saveDirectoryHandle(handle){
+    try {
+      const db = await openDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(handle, DIR_KEY);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Sauvegarde dossier impossible'));
+      });
+      db.close();
+    } catch (e) {
+      console.warn('Dossier non mémorisé :', e);
+    }
+  }
+
+  async function loadSavedDirectoryHandle(){
+    try {
+      const db = await openDb();
+      const handle = await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(DIR_KEY);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error || new Error('Lecture dossier impossible'));
+      });
+      db.close();
+      return handle;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function verifyDirectoryPermission(handle){
+    if (!handle) return false;
+    if (!handle.queryPermission || !handle.requestPermission) return true;
+    const opts = { mode: 'read' };
+    try {
+      if ((await handle.queryPermission(opts)) === 'granted') return true;
+      return (await handle.requestPermission(opts)) === 'granted';
+    } catch (e) {
+      console.warn('Permission dossier impossible :', e);
+      return false;
+    }
+  }
+
+  async function scanDirectory(handle){
+    const found = [];
+
+    async function walk(dir, prefix, depth){
+      if (!dir || depth > 6) return;
+      const iterable = typeof dir.values === 'function' ? dir.values() : (typeof dir.entries === 'function' ? dir.entries() : []);
+
+      for await (const item of iterable) {
+        const entry = Array.isArray(item) ? item[1] : item;
+        if (!entry) continue;
+
+        if (entry.kind === 'file') {
+          if (isAudioFile(entry.name)) {
+            found.push({ name: entry.name, path: prefix + entry.name, handle: entry, source: 'directory' });
+          }
+        } else if (entry.kind === 'directory') {
+          await walk(entry, prefix + entry.name + '/', depth + 1);
+        }
+      }
+    }
+
+    await walk(handle, '', 0);
+    found.sort((a, b) => (a.path || a.name).localeCompare((b.path || b.name), 'fr', { sensitivity: 'base' }));
+    return found;
+  }
+
+  function revokeCurrentUrl(){
+    if (currentUrl) {
+      URL.revokeObjectURL(currentUrl);
+      currentUrl = null;
+    }
+  }
+
+  function normalizeIndex(index){
+    if (!tracks.length) return 0;
+    return (index + tracks.length) % tracks.length;
+  }
+
+  async function getTrackFile(track){
+    if (!track) return null;
+    if (track.file) return track.file;
+    if (track.handle && typeof track.handle.getFile === 'function') return await track.handle.getFile();
+    return null;
+  }
+
+  async function loadTrack(index){
+    if (!audio || !tracks.length) {
+      revokeCurrentUrl();
+      if (audio) audio.removeAttribute('src');
+      setStatus('🎵 Ma musique : appuie sur Play');
+      return false;
+    }
+
+    currentIndex = normalizeIndex(index);
+    const track = tracks[currentIndex];
+
+    try {
+      const file = await getTrackFile(track);
+      if (!file) throw new Error('Fichier audio introuvable');
+
+      revokeCurrentUrl();
+      currentUrl = URL.createObjectURL(file);
+      audio.src = currentUrl;
+      audio.loop = false;
+      audio.load();
+      setStatus(`✅ Prêt • ${currentIndex + 1}/${tracks.length} • ${cleanName(track.path || track.name)}`);
+      return true;
+    } catch (e) {
+      console.warn('Chargement musique impossible :', e);
+      notify('Impossible de charger cette musique. J’essaie la suivante.');
+      if (tracks.length > 1) return await loadTrack(currentIndex + 1);
+      setStatus('🎵 Musique illisible');
+      return false;
+    }
+  }
+
+  async function playLoadedTrack(){
+    if (!audio) return false;
+    if (!audio.src && tracks.length) {
+      const loaded = await loadTrack(currentIndex);
+      if (!loaded) return false;
+    }
+    if (!audio.src) return false;
+
+    try {
+      await audio.play();
+      const track = tracks[currentIndex];
+      if (track) setStatus(`▶️ ${currentIndex + 1}/${tracks.length} • ${cleanName(track.path || track.name)}`);
+      return true;
+    } catch(e) {
+      console.warn('Lecture audio bloquée :', e);
+      notify('Lecture bloquée par le navigateur : appuie encore une fois sur Play.');
+      return false;
+    }
+  }
+
+  function prepareFilePicker(input){
+    if (!input) return false;
+    try { input.value = ''; } catch(e) {}
+    input.click();
+    return true;
+  }
+
+  async function pickDirectoryAndBuildPlaylist(){
+    if (!canPickDirectory) {
+      notify('Choix direct d’un dossier indisponible ici. Sélectionne tes musiques manuellement.');
+      if (folderPicker && 'webkitdirectory' in folderPicker) {
+        return prepareFilePicker(folderPicker);
+      }
+      return prepareFilePicker(filePicker);
+    }
+
+    try {
+      const handle = await window.showDirectoryPicker({ mode: 'read' });
+      const granted = await verifyDirectoryPermission(handle);
+      if (!granted) {
+        notify('Autorisation refusée pour le dossier musique.');
+        return false;
+      }
+
+      directoryHandle = handle;
+      await saveDirectoryHandle(handle);
+      return await buildPlaylistFromDirectory(handle);
+    } catch (e) {
+      if (e && e.name !== 'AbortError') {
+        console.warn('Choix du dossier impossible :', e);
+        notify('Impossible d’ouvrir ce dossier. Sélectionne tes musiques manuellement.');
+        return prepareFilePicker(filePicker);
+      }
+      return false;
+    }
+  }
+
+  async function buildPlaylistFromDirectory(handle){
+    if (!handle || busy) return false;
+    busy = true;
+    setStatus('🎵 Analyse du dossier musique…');
+
+    try {
+      const granted = await verifyDirectoryPermission(handle);
+      if (!granted) {
+        busy = false;
+        notify('Autorise à nouveau le dossier musique.');
+        return false;
+      }
+
+      const found = await scanDirectory(handle);
+      busy = false;
+
+      if (!found.length) {
+        tracks = [];
+        revokeCurrentUrl();
+        if (audio) audio.removeAttribute('src');
+        setStatus('🎵 Aucun fichier audio dans ce dossier');
+        notify('Aucune musique compatible trouvée dans ce dossier.');
+        return false;
+      }
+
+      tracks = shuffle(found);
+      currentIndex = 0;
+      await loadTrack(0);
+      notify(`${tracks.length} musique${tracks.length > 1 ? 's' : ''} trouvée${tracks.length > 1 ? 's' : ''}. Appuie sur Play pour lancer.`);
+      return true;
+    } catch (e) {
+      busy = false;
+      console.warn('Analyse dossier impossible :', e);
+      notify('Impossible d’analyser ce dossier musique.');
+      return false;
+    }
+  }
+
+  async function ensurePlaylistReady(){
+    if (tracks.length) return true;
+
+    if (directoryHandle) {
+      const ok = await buildPlaylistFromDirectory(directoryHandle);
+      if (ok) return true;
+    }
+
+    return await pickDirectoryAndBuildPlaylist();
+  }
+
+  async function handlePlay(){
+    const token = Date.now();
+    lastPlayRequest = token;
+    if (busy) {
+      setStatus('🎵 Préparation de la musique…');
+      return;
+    }
+
+    if (!tracks.length) {
+      const ok = await ensurePlaylistReady();
+      if (!ok || lastPlayRequest !== token) return;
+      // Important mobile : après sélection/autorisation, on demande un second appui Play.
+      // Ça évite le blocage audio fréquent après showDirectoryPicker ou sélecteur de fichiers.
+      return;
+    }
+
+    await playLoadedTrack();
+  }
+
+  function stopCurrent(){
+    if (!audio) return;
+    audio.pause();
+    try { audio.currentTime = 0; } catch(e) {}
+    const track = tracks[currentIndex];
+    setStatus(track ? `⏹️ ${currentIndex + 1}/${tracks.length} • ${cleanName(track.path || track.name)}` : '🎵 Ma musique : appuie sur Play');
+  }
+
+  async function nextTrack(){
+    if (!tracks.length) {
+      await ensurePlaylistReady();
+      return;
+    }
+    const loaded = await loadTrack(currentIndex + 1);
+    if (loaded) await playLoadedTrack();
+  }
+
+  async function prevTrack(){
+    if (!tracks.length) {
+      await ensurePlaylistReady();
+      return;
+    }
+    const loaded = await loadTrack(currentIndex - 1);
+    if (loaded) await playLoadedTrack();
+  }
+
+  async function useSelectedFiles(fileList, sourceLabel){
+    const selected = Array.from(fileList || []).filter(isAudioFile);
+
+    if (!selected.length) {
+      setStatus('🎵 Ma musique : appuie sur Play');
+      notify('Aucun fichier audio sélectionné.');
+      return;
+    }
+
+    directoryHandle = null;
+    tracks = shuffle(selected.map((file) => ({
+      name: file.name,
+      path: file.webkitRelativePath || file.name,
+      file,
+      source: sourceLabel || 'files'
+    })));
+    currentIndex = 0;
+    await loadTrack(0);
+    notify(`${tracks.length} musique${tracks.length > 1 ? 's' : ''} sélectionnée${tracks.length > 1 ? 's' : ''}. Appuie sur Play.`);
+  }
+
+  if (filePicker) {
+    filePicker.addEventListener('change', () => useSelectedFiles(filePicker.files, 'files'));
+  }
+
+  if (folderPicker) {
+    folderPicker.addEventListener('change', () => useSelectedFiles(folderPicker.files, 'folder-input'));
+  }
+
+  function guardFsButton(fn){
+    return function(e){
+      if(e){ e.preventDefault(); e.stopPropagation(); }
+      return fn();
+    };
+  }
+
+  if (playBtn) playBtn.addEventListener('click', handlePlay);
+  if (stopBtn) stopBtn.addEventListener('click', stopCurrent);
+  if (nextBtn) nextBtn.addEventListener('click', nextTrack);
+  if (prevBtn) prevBtn.addEventListener('click', prevTrack);
+  if (fsPlayBtn) fsPlayBtn.addEventListener('click', guardFsButton(handlePlay));
+  if (fsStopBtn) fsStopBtn.addEventListener('click', guardFsButton(stopCurrent));
+  if (fsNextBtn) fsNextBtn.addEventListener('click', guardFsButton(nextTrack));
+  if (fsPrevBtn) fsPrevBtn.addEventListener('click', guardFsButton(prevTrack));
+
+  if (audio) {
+    audio.addEventListener('ended', () => {
+      if (tracks.length > 1) nextTrack();
+      else stopCurrent();
+    });
+    audio.addEventListener('error', () => {
+      console.warn('Erreur élément audio :', audio.error);
+      notify('Cette musique ne peut pas être lue par le navigateur.');
+    });
+  }
+
+  (async function initMusicFolder(){
+    directoryHandle = await loadSavedDirectoryHandle();
+    if (directoryHandle) {
+      setStatus('🎵 Dossier mémorisé • Play');
+    } else if (canPickDirectory) {
+      setStatus('🎵 Play : choisir un dossier');
+    } else {
+      setStatus('🎵 Play : choisir des musiques');
+    }
+  })();
+
+  window.addEventListener('beforeunload', revokeCurrentUrl);
+})();
+</script>
+
+
+<script>
+(function(){
+  const installZone = document.getElementById('installPwaZone');
+  const installBtn = document.getElementById('installPwaBtn');
+  const statusEl = document.getElementById('installPwaStatus');
+  const INSTALL_FLAG = 'cariste_runner_pwa_installed';
+  let deferredPrompt = null;
+
+  function isStandalone(){
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function rememberInstalled(){
+    try { localStorage.setItem(INSTALL_FLAG, '1'); } catch(e){}
+  }
+
+  function hasInstalledMemory(){
+    try { return localStorage.getItem(INSTALL_FLAG) === '1'; } catch(e){ return false; }
+  }
+
+  function notify(message){
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    if (toast && toastMsg) {
+      toastMsg.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(window.__installToastTimer);
+      window.__installToastTimer = window.setTimeout(() => toast.classList.remove('show'), 3200);
+    } else {
+      alert(message);
+    }
+  }
+
+  function setStatus(text){
+    if (statusEl) statusEl.textContent = text;
+  }
+
+  function hideInstallButton(text){
+    if (installBtn) installBtn.hidden = true;
+    if (statusEl) statusEl.hidden = true;
+    if (installZone) {
+      installZone.classList.add('is-hidden');
+      installZone.setAttribute('aria-hidden', 'true');
+    }
+    if (text) setStatus(text);
+  }
+
+  function showInstallButton(text){
+    if (!installBtn) return;
+    if (installZone) {
+      installZone.classList.remove('is-hidden');
+      installZone.removeAttribute('aria-hidden');
+    }
+    installBtn.hidden = false;
+    installBtn.classList.add('ready');
+    installBtn.innerHTML = '<span class="install-cta-icon" aria-hidden="true">📲</span><span class="install-cta-text">Installer l’application</span>';
+    if (statusEl) statusEl.hidden = false;
+    setStatus(text || 'Installation disponible • le bouton disparaît après installation.');
+  }
+
+  function refreshInstallButton(){
+    if (!installBtn) return;
+
+    if (isStandalone()) {
+      rememberInstalled();
+      hideInstallButton('Application déjà installée.');
+      return;
+    }
+
+    if (hasInstalledMemory()) {
+      hideInstallButton('Application déjà installée.');
+      return;
+    }
+
+    if (deferredPrompt) {
+      showInstallButton('Installation disponible • le bouton disparaît après installation.');
+    } else {
+      // On masque le bouton tant que le navigateur ne confirme pas que l’installation est possible.
+      // Ça évite de garder un bouton inutile après installation ou dans les navigateurs non compatibles.
+      hideInstallButton('Installation non proposée par le navigateur pour l’instant.');
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+
+    if (isStandalone()) {
+      rememberInstalled();
+      deferredPrompt = null;
+      hideInstallButton('Application déjà installée.');
+      return;
+    }
+
+    // Si le navigateur repropose vraiment l’installation, on considère que l’ancien marqueur local était périmé.
+    try { localStorage.removeItem(INSTALL_FLAG); } catch(e){}
+
+    deferredPrompt = event;
+    refreshInstallButton();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    rememberInstalled();
+    hideInstallButton('Application installée.');
+    notify('Cariste Runner est installé.');
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (isStandalone() || hasInstalledMemory()) {
+        rememberInstalled();
+        notify('Cariste Runner est déjà installé.');
+        hideInstallButton('Application déjà installée.');
+        return;
+      }
+
+      if (!deferredPrompt) {
+        notify('Installation indisponible pour le moment. Recharge la page depuis Chrome si besoin.');
+        hideInstallButton('Installation non proposée par le navigateur pour l’instant.');
+        return;
+      }
+
+      try {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+
+        if (choice && choice.outcome === 'accepted') {
+          rememberInstalled();
+          notify('Installation lancée.');
+          hideInstallButton('Installation lancée.');
+        } else {
+          notify('Installation annulée.');
+          hideInstallButton('Installation annulée. Recharge la page pour réessayer si besoin.');
+        }
+      } catch (error) {
+        console.warn('Erreur installation PWA :', error);
+        notify('Impossible de lancer l’installation depuis ce navigateur.');
+        hideInstallButton('Installation impossible depuis ce navigateur.');
+      }
+    });
+  }
+
+  refreshInstallButton();
+  window.setTimeout(refreshInstallButton, 700);
+})();
+</script>
+
+</body>
+</html>

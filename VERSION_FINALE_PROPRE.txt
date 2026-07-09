@@ -1,0 +1,23 @@
+Cariste Runner — Version finale propre
+Base gameplay : V3.7.2 final polish
+Source visuelle : V3.1 restore original gameplay landscape
+
+Conservé depuis V3.7.2 :
+- logique gameplay complète ;
+- dimensions canvas/cadre ;
+- joueur/chariot ;
+- saut, gravité, collisions, obstacles ;
+- boucle de jeu, vitesse, plein écran existant, contrôles.
+
+Récupéré depuis V3.1 uniquement hors gameplay :
+- fond visuel entrepôt ;
+- réorganisation propre des boutons et infos ;
+- style industriel des boutons ;
+- signature finale CR3ATIX ;
+- mise en cache PWA du nouveau fond.
+
+Nettoyage :
+- aucune règle V3.1 de redimensionnement canvas/game-frame conservée ;
+- aucune variable PORTRAIT_GAME_SCALE / BASE_PLAYER / PORTRAIT_PLAYER_X conservée ;
+- aucun mode cr-virtual-landscape ajouté ;
+- aucune modification de joueur, hitbox, collision, obstacle, saut ou vitesse importée depuis V3.1.

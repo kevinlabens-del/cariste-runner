@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1324" />
+  <title>Ouverture du chat — Cariste Runner</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:linear-gradient(180deg,#0b1324,#07101f);color:#f8fafc;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{display:grid;place-items:center;padding:24px}
+    .card{width:min(520px,100%);border:1px solid rgba(255,255,255,.14);background:rgba(15,23,42,.88);border-radius:24px;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.34);text-align:center}
+    h1{font-size:24px;margin:0 0 10px}
+    p{color:#cbd5e1;line-height:1.45;margin:0 0 18px}
+    .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    a,button{appearance:none;border:0;border-radius:999px;padding:13px 18px;font-weight:900;color:#fff;text-decoration:none;cursor:pointer}
+    .open{background:linear-gradient(180deg,#38bdf8,#0284c7)}
+    .back{background:linear-gradient(180deg,#22c55e,#059669)}
+    small{display:block;color:#94a3b8;margin-top:16px}
+  
+    /* Commandes sous forme d'icônes seules. */
+    .row a,.row button{
+      width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;
+      padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;
+      box-shadow:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+      font-size:30px!important;line-height:1!important;-webkit-tap-highlight-color:transparent;transition:transform .13s ease,filter .13s ease;
+    }
+    .row a:hover,.row button:hover{filter:drop-shadow(0 4px 7px rgba(0,0,0,.55)) brightness(1.12);}
+    .row a:active,.row button:active{transform:scale(.86);}
+
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1>💬 Ouverture du chat</h1>
+    <p>Le chat s’ouvre directement via Google Apps Script pour éviter le blocage d’intégration dans l’application.</p>
+    <div class="row">
+      <a class="open" id="openLink" rel="noopener" aria-label="Ouvrir le chat" title="Ouvrir le chat">💬</a>
+      <button class="back" id="backBtn" type="button" aria-label="Retour au jeu" title="Retour au jeu">↩️</button>
+    </div>
+    <small>Si rien ne se passe, touche “Ouvrir le chat”.</small>
+  </main>
+  <script>
+    const CHAT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzhla8VlrjSomRZaI596ezb0OM887q8NRqBcI34-Pq9iBTL11tjFgf1zd8hSH6bvtkd/exec';
+    const params = new URLSearchParams(location.search);
+    const storedPseudo = (localStorage.getItem('cariste_player') || '').trim();
+    const pseudo = (params.get('pseudo') || storedPseudo || 'Joueur').trim().slice(0,20);
+    const url = new URL(CHAT_WEBAPP_URL);
+    url.searchParams.set('page','chat');
+    url.searchParams.set('pseudo', pseudo);
+    const openLink = document.getElementById('openLink');
+    openLink.href = url.href;
+    document.getElementById('backBtn').addEventListener('click',()=>{ location.href='./accueil.html'; });
+    setTimeout(()=>{ location.href = url.href; }, 250);
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); }
+  </script>
+</body>
+</html>

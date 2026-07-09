@@ -1,0 +1,13 @@
+CARISTE RUNNER FINAL V3.5.1 — MODIFICATION INTERFACE ICÔNES
+
+Modification demandée :
+- Tous les contrôles visuels principaux sont affichés sous forme d’icônes seules.
+- Suppression visuelle des fonds, cadres, bordures et ombres donnant une forme de bouton.
+- Conservation d’une zone tactile invisible d’au moins 44 x 44 px pour l’utilisation sur Android.
+- Conservation des fonctions JavaScript existantes et du gameplay.
+- Ajout/maintien des aria-label et title pour l’accessibilité et la compréhension de chaque icône.
+
+Icônes principales :
+👤 pseudo | ▶️ jouer | ⏸️ pause | 🏆 classement | 💬 chat | 📲 installer
+⏮️ précédent | ▶️ lecture | ⏹️ stop | ⏭️ suivant | ✅ valider | ⛶ plein écran
+🔄 actualiser | ↩️ retour
