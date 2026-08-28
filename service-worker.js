@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cariste-runner-cache-v3-5-6-four-boxes-per-layer-10-layers-perf-cache-obstacles';
+const CACHE_NAME = 'cariste-runner-cache-v3-5-7-pseudo-recovery';
 
 const CORE_ASSETS = [
   './',

@@ -215,7 +215,7 @@ const OIL_BARREL_OFFSET = 180; // Ecart en px entre palettes et bidon d'huile
   // UI refs
   const scoreEl=$('#score'), bestEl=$('#best'), speedEl=$('#speed'), levelEl=$('#level');
   const playBtn=$('#playBtn'), pauseBtn=$('#pauseBtn');
-  const nameModal=$('#nameModal'), nameInput=$('#nameInput'), saveNameBtn=$('#saveNameBtn'), setNameBtn=$('#setNameBtn'), nameStatus=$('#nameStatus');
+  const nameModal=$('#nameModal'), nameInput=$('#nameInput'), pinInput=$('#pinInput'), saveNameBtn=$('#saveNameBtn'), setNameBtn=$('#setNameBtn'), nameStatus=$('#nameStatus'), createNameModeBtn=$('#createNameModeBtn'), recoverNameModeBtn=$('#recoverNameModeBtn'), nameTitle=$('#nameTitle'), nameHelp=$('#nameHelp');
 
   const viewportMeta = document.querySelector('meta[name="viewport"]');
   const VIEWPORT_LOCK = 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover';
@@ -271,169 +271,148 @@ const OIL_BARREL_OFFSET = 180; // Ecart en px entre palettes et bidon d'huile
     if(typeof item === 'string') return item;
     return String(item.name || item.pseudo || item.player || item.playerName || item.username || '').trim();
   }
-  async function fetchTakenPseudos(){
-    if(!SCORE_API_URL) return new Set();
+  function cleanPinInput(){
+    if(!pinInput) return '';
+    const clean = String(pinInput.value || '').replace(/\D/g,'').slice(0,4);
+    if(pinInput.value !== clean) pinInput.value = clean;
+    return clean;
+  }
+  function hash32(text){
+    let h = 0x811c9dc5;
+    const s = String(text || '');
+    for(let i=0;i<s.length;i++){
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16).padStart(8,'0');
+  }
+  function recoveryMarker(raw, pin){
+    const pseudo = normalizePseudo(raw);
+    return '~r' + hash32(pseudo) + hash32(pseudo + '|' + pin + '|cariste-runner');
+  }
+  function isRecoveryMarker(raw){
+    return /^~r[0-9a-f]{16}$/i.test(String(raw || '').trim());
+  }
+  async function fetchPseudoRecords(){
+    if(!SCORE_API_URL) throw new Error('API indisponible');
     const sep = SCORE_API_URL.includes('?') ? '&' : '?';
     const res = await fetch(SCORE_API_URL + sep + 'check=pseudos&t=' + Date.now(), { method:'GET', cache:'no-store' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    const taken = new Set();
-    getOnlineListFromPayload(data).forEach(item => {
-      const n = normalizePseudo(itemPseudo(item));
-      if(n) taken.add(n);
-    });
-    return taken;
+    return getOnlineListFromPayload(data).map(itemPseudo).filter(Boolean);
   }
-
-  let pseudoListCache = null;
-  let pseudoListLoading = null;
-  let pseudoCheckTimer = 0;
-  let pseudoCheckSeq = 0;
-  let pseudoOnlineConfirmed = false;
-
-  async function loadPseudoList(force=false){
-    if(!force && pseudoListCache) return pseudoListCache;
-    if(!force && pseudoListLoading) return pseudoListLoading;
-    pseudoListLoading = fetchTakenPseudos()
-      .then(set => { pseudoListCache = set; return set; })
-      .finally(() => { pseudoListLoading = null; });
-    return pseudoListLoading;
+  async function reserveTechnicalRecord(raw){
+    const body = new URLSearchParams({ name: String(raw || '').slice(0,20), score: '0', register: '1' });
+    const res = await fetch(SCORE_API_URL, { method:'POST', body });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
   }
   function isCurrentPseudo(raw){
     const current = normalizePseudo(state.playerName || getPlayer());
     return !!current && normalizePseudo(raw) === current;
   }
-  function localPseudoState(){
-    const raw = cleanPseudoInput();
-    const wanted = normalizePseudo(raw);
-    if(!raw) return { status:'empty', raw, wanted, message:'Entre un pseudo entre 2 et 20 caractères.' };
-    if(raw.length < 2) return { status:'short', raw, wanted, message:'Choisis un pseudo d’au moins 2 caractères.' };
-    if(isCurrentPseudo(raw)) return { status:'current', raw, wanted, message:'Pseudo actuel conservé ✅' };
-    if(!pseudoListCache) return { status:'loading', raw, wanted, message:'Chargement des pseudos existants…' };
-    if(pseudoListCache.has(wanted)) return { status:'taken', raw, wanted, message:'Ce pseudo existe déjà. Choisis un autre pseudo.' };
-    return { status:'local-ok', raw, wanted, message:'Pseudo disponible localement. Vérification en ligne…' };
+
+  let nameMode = 'create';
+  function setNameMode(mode){
+    nameMode = mode === 'recover' ? 'recover' : 'create';
+    if(createNameModeBtn) createNameModeBtn.style.opacity = nameMode === 'create' ? '1' : '.55';
+    if(recoverNameModeBtn) recoverNameModeBtn.style.opacity = nameMode === 'recover' ? '1' : '.55';
+    if(nameTitle) nameTitle.textContent = nameMode === 'recover' ? 'Récupérer mon pseudo' : (state.playerName ? 'Mon pseudo' : 'Nouveau joueur');
+    if(nameHelp) nameHelp.textContent = nameMode === 'recover'
+      ? 'Entre ton ancien pseudo et le code à 4 chiffres que tu avais choisi.'
+      : (state.playerName
+          ? 'Tu peux sécuriser ton pseudo actuel ou en choisir un nouveau avec un code à 4 chiffres.'
+          : 'Choisis un pseudo unique et ton propre code personnel à 4 chiffres.');
+    setNameStatus(nameMode === 'recover'
+      ? 'Le contrôle en ligne se fait uniquement lorsque tu appuies sur Valider.'
+      : 'Le pseudo sera contrôlé une seule fois au moment de sa création.', '');
+    refreshPseudoInputState();
   }
   function refreshPseudoInputState(){
-    clearTimeout(pseudoCheckTimer);
-    pseudoOnlineConfirmed = false;
-    setNameSaveEnabled(false);
-    const st = localPseudoState();
-    if(st.status === 'empty' || st.status === 'short'){
-      setNameStatus(st.message, 'err');
-      return;
-    }
-    if(st.status === 'current'){
-      pseudoOnlineConfirmed = true;
-      setNameStatus(st.message, 'ok');
-      setNameSaveEnabled(true);
-      return;
-    }
-    if(st.status === 'loading'){
-      setNameStatus(st.message, 'wait');
-      return;
-    }
-    if(st.status === 'taken'){
-      setNameStatus(st.message, 'err');
-      return;
-    }
-    setNameStatus(st.message, 'wait');
-    pseudoCheckTimer = setTimeout(() => confirmPseudoOnline(false), 450);
-  }
-  async function confirmPseudoOnline(finalCheck=false){
-    const seq = ++pseudoCheckSeq;
-    const st = localPseudoState();
-    if(st.status === 'current'){
-      pseudoOnlineConfirmed = true;
-      setNameSaveEnabled(true);
-      return true;
-    }
-    if(st.status !== 'local-ok'){
-      refreshPseudoInputState();
-      return false;
-    }
-    setNameSaveEnabled(false);
-    setNameStatus(finalCheck ? 'Dernière vérification en ligne…' : 'Vérification en ligne…', 'wait');
-    try{
-      const taken = await loadPseudoList(true);
-      if(seq !== pseudoCheckSeq && !finalCheck) return false;
-      if(taken.has(st.wanted)){
-        pseudoOnlineConfirmed = false;
-        setNameStatus('Ce pseudo existe déjà. Choisis un autre pseudo.', 'err');
-        setNameSaveEnabled(false);
-        return false;
-      }
-      pseudoOnlineConfirmed = true;
-      setNameStatus('Pseudo disponible ✅', 'ok');
-      setNameSaveEnabled(true);
-      return true;
-    }catch(e){
-      console.warn('Pseudo live check error:', e);
-      pseudoOnlineConfirmed = false;
-      setNameStatus('Impossible de vérifier en ligne. Vérifie ta connexion.', 'err');
-      setNameSaveEnabled(false);
-      return false;
-    }
-  }
-  async function reservePseudoOnline(raw){
-    // Avec l'API actuelle de score, on réserve le pseudo par un score 0.
-    // Le classement filtre ensuite les scores à 0 pour ne pas polluer l'affichage public.
-    if(!SCORE_API_URL) return;
-    const body = new URLSearchParams({ name: String(raw||'Anonyme').slice(0,20), score: '0', register: '1' });
-    const res = await fetch(SCORE_API_URL, { method:'POST', body });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const raw = cleanPseudoInput();
+    const pin = cleanPinInput();
+    let ok = raw.length >= 2 && pin.length === 4;
+    setNameSaveEnabled(ok);
+    if(!raw){ setNameStatus('Entre un pseudo entre 2 et 20 caractères.', ''); return; }
+    if(raw.length < 2){ setNameStatus('Choisis un pseudo d’au moins 2 caractères.', 'err'); return; }
+    if(pin.length < 4){ setNameStatus('Choisis ton code personnel à 4 chiffres.', ''); return; }
+    setNameStatus(nameMode === 'recover' ? 'Prêt à récupérer ce pseudo.' : 'Prêt à créer ou sécuriser ce pseudo.', 'ok');
   }
   function openName(){
     lockMobileViewport();
     nameModal.classList.add('open');
-    nameInput.value=state.playerName||'';
-    pseudoOnlineConfirmed = false;
-    setNameSaveEnabled(false);
-    setNameStatus('Chargement des pseudos existants…', 'wait');
-    loadPseudoList(true)
-      .then(() => refreshPseudoInputState())
-      .catch(e => {
-        console.warn('Pseudo list load error:', e);
-        setNameStatus('Impossible de charger les pseudos. Vérifie ta connexion.', 'err');
-        setNameSaveEnabled(false);
-      });
+    nameInput.value = state.playerName || '';
+    if(pinInput) pinInput.value = '';
+    setNameMode('create');
+    refreshPseudoInputState();
   }
   function closeName(){ nameModal.classList.remove('open') }
   setNameBtn.addEventListener('click',openName);
   saveNameBtn.addEventListener('click',saveName);
+  if(createNameModeBtn) createNameModeBtn.addEventListener('click',()=>setNameMode('create'));
+  if(recoverNameModeBtn) recoverNameModeBtn.addEventListener('click',()=>setNameMode('recover'));
   nameInput.addEventListener('focus',()=>{ lockMobileViewport(); document.documentElement.classList.add('cr-name-focus'); setTimeout(()=>{ try{nameInput.scrollIntoView({block:'center',inline:'nearest'});}catch(e){} },80); });
   nameInput.addEventListener('blur',()=>{ lockMobileViewport(); document.documentElement.classList.remove('cr-name-focus'); setTimeout(()=>{ try{ window.scrollTo({left:0,top:0,behavior:'instant'}); }catch(e){ try{window.scrollTo(0,0)}catch(_){} } },120); });
   nameInput.addEventListener('touchstart', lockMobileViewport, {passive:true});
   nameInput.addEventListener('input',refreshPseudoInputState);
-  nameInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!saveNameBtn.disabled) saveName(); } })
+  if(pinInput){
+    pinInput.addEventListener('input',refreshPseudoInputState);
+    pinInput.addEventListener('touchstart', lockMobileViewport, {passive:true});
+    pinInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!saveNameBtn.disabled) saveName(); } });
+  }
+  nameInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(pinInput) pinInput.focus(); } });
+
   async function saveName(){
-    const raw=cleanPseudoInput();
-    if(!raw){ setNameStatus('Entre un pseudo entre 2 et 20 caractères.', 'err'); setNameSaveEnabled(false); return }
-    if(raw.length < 2){ setNameStatus('Choisis un pseudo d’au moins 2 caractères.', 'err'); setNameSaveEnabled(false); return }
-    if(isCurrentPseudo(raw)){
-      setPlayer(raw); state.playerName=raw; refreshPlayerUI(); closeName(); return;
-    }
-    const st = localPseudoState();
-    if(st.status === 'taken'){
-      setNameStatus('Ce pseudo existe déjà. Choisis un autre pseudo.', 'err');
-      setNameSaveEnabled(false);
-      return;
-    }
+    const raw = cleanPseudoInput();
+    const pin = cleanPinInput();
+    if(raw.length < 2){ setNameStatus('Choisis un pseudo d’au moins 2 caractères.', 'err'); return; }
+    if(!/^\d{4}$/.test(pin)){ setNameStatus('Le code doit contenir exactement 4 chiffres.', 'err'); return; }
     setNameSaveEnabled(false);
+    setNameStatus(nameMode === 'recover' ? 'Récupération du pseudo…' : 'Création du pseudo…', 'wait');
     try{
-      const ok = await confirmPseudoOnline(true);
-      if(!ok) return;
-      setNameStatus('Réservation du pseudo…', 'wait');
-      await reservePseudoOnline(raw);
-      if(pseudoListCache) pseudoListCache.add(normalizePseudo(raw));
+      const records = await fetchPseudoRecords();
+      const normalizedRecords = new Set(records.filter(n => !isRecoveryMarker(n)).map(normalizePseudo));
+      const marker = recoveryMarker(raw, pin);
+      const markerExists = records.some(n => String(n).trim().toLowerCase() === marker.toLowerCase());
+
+      if(nameMode === 'recover'){
+        if(!normalizedRecords.has(normalizePseudo(raw))){
+          setNameStatus('Ce pseudo n’existe pas.', 'err'); setNameSaveEnabled(true); return;
+        }
+        if(!markerExists){
+          setNameStatus('Pseudo ou code incorrect. Les anciens pseudos sans code doivent d’abord être sécurisés depuis leur appareil actuel.', 'err');
+          setNameSaveEnabled(true); return;
+        }
+        setPlayer(raw);
+        localStorage.setItem('cariste_recovery_ready','1');
+        state.playerName = raw;
+        refreshPlayerUI();
+        setNameStatus('Pseudo récupéré ✅', 'ok');
+        closeName();
+        return;
+      }
+
+      const current = isCurrentPseudo(raw);
+      if(normalizedRecords.has(normalizePseudo(raw)) && !current){
+        setNameStatus('Ce pseudo existe déjà. Choisis-en un autre ou utilise « Récupérer mon pseudo ».', 'err');
+        setNameSaveEnabled(true); return;
+      }
+
+      if(!current && !normalizedRecords.has(normalizePseudo(raw))){
+        await reserveTechnicalRecord(raw);
+      }
+      if(!markerExists){
+        await reserveTechnicalRecord(marker);
+      }
       setPlayer(raw);
-      state.playerName=raw;
+      localStorage.setItem('cariste_recovery_ready','1');
+      state.playerName = raw;
       refreshPlayerUI();
-      setNameStatus('Pseudo validé ✅', 'ok');
+      setNameStatus(current ? 'Pseudo sécurisé avec ton code ✅' : 'Pseudo créé ✅', 'ok');
       closeName();
     }catch(e){
-      console.warn('Pseudo save error:', e);
-      setNameStatus('Impossible de valider le pseudo en ligne. Réessaie.', 'err');
-      setNameSaveEnabled(false);
+      console.warn('Pseudo create/recovery error:', e);
+      setNameStatus('Connexion impossible. Réessaie lorsque tu as du réseau.', 'err');
+      setNameSaveEnabled(true);
     }
   }
 
