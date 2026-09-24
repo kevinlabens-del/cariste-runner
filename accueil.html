@@ -1013,6 +1013,7 @@
         <button class="btn secondary icon-only-btn" id="pauseBtn" type="button" aria-label="Mettre en pause" title="Mettre en pause"><span class="icon-glyph" aria-hidden="true">⏸️</span></button>
         <button class="btn icon-btn" id="onlineBtn" type="button" aria-label="Classement en ligne" title="Classement en ligne"><span class="icon-glyph" aria-hidden="true">🏆</span><span class="icon-label">Top</span></button>
         <button class="btn icon-only-btn" id="chatBtn" type="button" aria-label="Chat de groupe" title="Chat de groupe"><span class="icon-glyph" aria-hidden="true">💬</span></button>
+        <button class="btn icon-btn" id="shareAppBtn" type="button" aria-label="Partager Cariste Runner" title="Partager le jeu"><span class="icon-glyph" aria-hidden="true">↗</span><span class="icon-label">Partager</span></button>
       </div>
 
       <div class="progress" title="Progression du niveau">
@@ -3230,5 +3231,49 @@ drawForklift(player);
 })();
 </script>
 
+<script>
+/* CR3ATIX_SHARE_V1 — le partage reste hors du canvas et des commandes tactiles. */
+(() => {
+  const button = document.getElementById('shareAppBtn');
+  if (!button) return;
+  const url = 'https://kevinlabens-del.github.io/cariste-runner/';
+  const notify = (message) => {
+    const toast = document.querySelector('.toast');
+    const text = toast?.querySelector('.msg');
+    if (!toast || !text) return;
+    text.textContent = message;
+    toast.classList.add('show');
+    window.setTimeout(() => toast.classList.remove('show'), 2200);
+  };
+  const fallback = async () => {
+    try {
+      if (window.isSecureContext && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        notify('Lien de Cariste Runner copié');
+        return;
+      }
+    } catch {}
+    const field = document.createElement('textarea');
+    field.value = url; field.readOnly = true;
+    field.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+    document.body.appendChild(field); field.select(); field.setSelectionRange(0, field.value.length);
+    let copied = false; try { copied = document.execCommand('copy'); } catch {}
+    field.remove();
+    if (copied) notify('Lien de Cariste Runner copié');
+    else window.prompt('Copie ce lien pour partager Cariste Runner :', url);
+  };
+  button.addEventListener('click', async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title:'Cariste Runner', text:'Viens jouer à Cariste Runner et tente de battre ton meilleur score dans l’entrepôt !', url });
+        return;
+      } catch (error) {
+        if (error && error.name === 'AbortError') return;
+      }
+    }
+    await fallback();
+  });
+})();
+</script>
 </body>
 </html>
