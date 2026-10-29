@@ -1,9 +1,11 @@
-const CACHE_NAME = 'cariste-runner-cache-v3-5-7-pseudo-recovery';
+const CACHE_NAME = 'cariste-runner-battletron-spck-test-v1';
 
 const CORE_ASSETS = [
   './',
   './index.html',
   './accueil.html',
+  './gamepad-main.js',
+  './gamepad-chat-test.js',
   './chat.html',
   './manifest.json',
   './manifest.webmanifest',
